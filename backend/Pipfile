@@ -1,0 +1,27 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+flask = "*"
+flask-sqlalchemy = "*"
+flask-migrate = "*"
+flask-jwt-extended = "*"
+flask-cors = "*"
+flask-mail = "*"
+psycopg2-binary = "*"
+bcrypt = "*"
+python-socketio = "*"
+eventlet = "*"
+flask-bcrypt = "*"
+redis = "*"
+celery = "*"
+flask-socketio = "*"
+requests = "*"
+python-dotenv = "*"
+
+[requires]
+python_version = "3.8"
+
+[dev-packages]

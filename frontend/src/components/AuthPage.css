@@ -1,0 +1,598 @@
+
+/* AuthPage.css - Fixed Full Screen Version */
+/* -------------------------------------------------
+   OVERRIDES for index.css and Tailwind
+   ------------------------------------------------- */
+
+/* REMOVE conflicting auth-container background, make it transparent */
+.auth-container {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  font-family: 'Arial', sans-serif !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+  z-index: 1 !important;
+  flex-grow: 1 !important;
+  width: 100% !important;
+  max-width: 900px !important;
+  min-height: 600px !important;
+  margin: 0 auto !important;
+  background: transparent !important; /* FIXED: Make transparent */
+}
+
+/* -------------------------------------------------
+   2. Forms wrapper - SAME SIZE
+   ------------------------------------------------- */
+.form-container {
+  background: #fff !important;
+  border-radius: 25px !important;
+  box-shadow: 0 20px 40px rgba(0,0,0,.25),
+              0 15px 15px rgba(0,0,0,.22) !important;
+  position: relative !important;
+  width: 900px !important;
+  max-width: 95% !important;
+  min-height: 600px !important;
+  overflow: hidden !important;
+  margin: 0 auto !important;
+}
+
+/* -------------------------------------------------
+   3. Forms - FULLY SCROLLABLE REGISTER FORM
+   ------------------------------------------------- */
+.form {
+  background: #fff !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: center !important;
+  padding: 0 60px !important;
+  height: 100% !important;
+  width: 50% !important;
+  text-align: center !important;
+  position: absolute !important;
+  top: 0 !important;
+  transition: all 0.6s ease-in-out !important;
+}
+
+.login-form {
+  left: 0 !important;
+  z-index: 2 !important;
+}
+
+.register-form {
+  left: 50% !important;
+  opacity: 0 !important;
+  z-index: 1 !important;
+  justify-content: flex-start !important;
+  padding-top: 40px !important;
+  padding-bottom: 40px !important;
+  overflow-y: auto !important;
+  max-height: 100% !important;
+}
+
+/* Custom scrollbar for register form */
+.register-form::-webkit-scrollbar {
+  width: 6px !important;
+}
+
+.register-form::-webkit-scrollbar-track {
+  background: #f1f1f1 !important;
+  border-radius: 3px !important;
+}
+
+.register-form::-webkit-scrollbar-thumb {
+  background: #ff4b2b !important;
+  border-radius: 3px !important;
+}
+
+.register-form::-webkit-scrollbar-thumb:hover {
+  background: #e03e1f !important;
+}
+
+.form-container.right-panel-active .login-form {
+  opacity: 0 !important;
+}
+
+.form-container.right-panel-active .register-form {
+  opacity: 1 !important;
+  z-index: 2 !important;
+}
+
+/* Form subtitle - SMALLER */
+.form-subtitle {
+  color: #666 !important;
+  font-size: 14px !important;
+  margin: 0 0 20px 0 !important;
+}
+
+/* -------------------------------------------------
+   4. Inputs / Buttons - SMALLER FONTS
+   ------------------------------------------------- */
+.form h2 {
+  margin: 0 0 12px 0 !important;
+  font-weight: bold !important;
+  font-size: 28px !important;
+  color: #333 !important;
+}
+
+/* Input Wrapper with Icons */
+.input-wrapper {
+  position: relative !important;
+  width: 100% !important;
+  margin: 10px 0 !important;
+}
+
+.input-wrapper .input-icon {
+  position: absolute !important;
+  left: 15px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  color: #777 !important;
+  font-size: 0.9rem !important;
+}
+
+.input-wrapper input {
+  background: #f8f8f8 !important;
+  border: 1px solid #e0e0e0 !important;
+  padding: 14px 40px !important;
+  width: 100% !important;
+  border-radius: 8px !important;
+  font-size: 14px !important;
+  transition: border-color 0.3s ease !important;
+}
+
+.input-wrapper input:focus {
+  outline: none !important;
+  border-color: #ff4b2b !important;
+  background: #fff !important;
+}
+
+/* Password Wrapper */
+.password-wrapper {
+  position: relative !important;
+  width: 100% !important;
+  margin: 10px 0 !important;
+}
+
+.password-wrapper .input-icon {
+  position: absolute !important;
+  left: 15px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  color: #777 !important;
+  font-size: 0.9rem !important;
+}
+
+.password-wrapper input {
+  background: #f8f8f8 !important;
+  border: 1px solid #e0e0e0 !important;
+  padding: 14px 70px 14px 40px !important;
+  width: 100% !important;
+  border-radius: 8px !important;
+  font-size: 14px !important;
+  transition: border-color 0.3s ease !important;
+}
+
+.password-wrapper input:focus {
+  outline: none !important;
+  border-color: #ff4b2b !important;
+  background: #fff !important;
+}
+
+.password-toggle {
+  position: absolute !important;
+  right: 15px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  cursor: pointer !important;
+  color: #777 !important;
+  transition: color 0.3s ease !important;
+  font-size: 1.1rem !important;
+  z-index: 2 !important;
+}
+
+.password-toggle:hover {
+  color: #ff4b2b !important;
+}
+
+/* Role Select */
+.select-wrapper {
+  position: relative !important;
+  width: 100% !important;
+  margin: 10px 0 !important;
+}
+
+.role-select {
+  background: #f8f8f8 !important;
+  border: 1px solid #e0e0e0 !important;
+  padding: 14px 20px !important;
+  width: 100% !important;
+  border-radius: 8px !important;
+  font-size: 14px !important;
+  transition: border-color 0.3s ease !important;
+  appearance: none !important;
+  cursor: pointer !important;
+}
+
+.role-select:focus {
+  outline: none !important;
+  border-color: #ff4b2b !important;
+  background: #fff !important;
+}
+
+/* Buttons - SMALLER */
+.form button {
+  border-radius: 20px !important;
+  border: 1px solid #ff4b2b !important;
+  background: #ff4b2b !important;
+  color: #fff !important;
+  font-size: 12px !important;
+  font-weight: bold !important;
+  padding: 14px 40px !important;
+  letter-spacing: 1px !important;
+  text-transform: uppercase !important;
+  transition: all 0.3s ease !important;
+  cursor: pointer !important;
+  margin-top: 20px !important;
+  width: 100% !important;
+}
+
+.form button:hover {
+  background: #e03e1f !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 12px rgba(255, 75, 43, 0.3) !important;
+}
+
+.form button:active {
+  transform: scale(0.98) !important;
+}
+
+.form button:focus {
+  outline: none !important;
+}
+
+.form button.ghost {
+  background: transparent !important;
+  border-color: #fff !important;
+}
+
+.form button.ghost:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 6px 12px rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Forgot Password - SMALLER */
+.forgot-password {
+  color: #666 !important;
+  font-size: 12px !important;
+  text-decoration: none !important;
+  margin: 15px 0 !important;
+  background: none !important;
+  border: none !important;
+  cursor: pointer !important;
+  transition: color 0.3s ease !important;
+}
+
+.forgot-password:hover {
+  color: #ff4b2b !important;
+}
+
+/* Error and Success Messages - SMALLER */
+.error-message {
+  background: #ffe6e6 !important;
+  color: #d63031 !important;
+  padding: 10px 15px !important;
+  border-radius: 6px !important;
+  margin: 12px 0 !important;
+  width: 100% !important;
+  font-size: 12px !important;
+  border: 1px solid #ff7675 !important;
+}
+
+.success-message {
+  background: #e6ffe6 !important;
+  color: #00b894 !important;
+  padding: 10px 15px !important;
+  border-radius: 6px !important;
+  margin: 12px 0 !important;
+  width: 100% !important;
+  font-size: 12px !important;
+  border: 1px solid #55efc4 !important;
+}
+
+/* -------------------------------------------------
+   6. Social Login Styles - SMALLER
+   ------------------------------------------------- */
+.social-login {
+  margin-top: 20px !important;
+  text-align: center !important;
+  width: 100% !important;
+  
+}
+
+.social-login p {
+  color: #666 !important;
+  font-size: 12px !important;
+  margin: 0 0 15px 0 !important;
+  position: relative !important;
+}
+
+.social-login p::before,
+.social-login p::after {
+  content: '' !important;
+  position: absolute !important;
+  top: 50% !important;
+  width: 30% !important;
+  height: 1px !important;
+  background: #e0e0e0 !important;
+}
+
+.social-login p::before {
+  left: 0 !important;
+}
+
+.social-login p::after {
+  right: 0 !important;
+}
+
+.social-btn {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  padding: 12px 20px !important;
+  border: 1px solid #e0e0e0 !important;
+  border-radius: 8px !important;
+  background: white !important;
+  cursor: pointer !important;
+  transition: all 0.3s ease !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  color: #666 !important;
+  width: 100% !important;
+  max-width: 200px !important;
+  margin: 0 auto !important;
+}
+
+.social-btn:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 12px rgba(0,0,0,0.1) !important;
+  border-color: #db4437 !important;
+  color: #db4437 !important;
+}
+
+.google-btn svg {
+  color: #db4437 !important;
+  font-size: 1rem !important;
+}
+
+/* -------------------------------------------------
+   7. Overlay (red panel) - SMALLER FONTS
+   ------------------------------------------------- */
+.overlay-container {
+  position: absolute !important;
+  top: 0 !important;
+  left: 50% !important;
+  width: 50% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+  transition: transform 0.6s ease-in-out !important;
+  z-index: 100 !important;
+  border-radius: 60px !important;
+}
+
+.overlay {
+  background: #ff416c !important;
+  background: linear-gradient(to right, #ff4b2b, #ff416c) !important;
+  background-repeat: no-repeat !important;
+  background-size: cover !important;
+  background-position: 0 0 !important;
+  color: #fff !important;
+  position: relative !important;
+  left: -100% !important;
+  height: 100% !important;
+  width: 200% !important;
+  transform: translateX(0) !important;
+  transition: transform 0.6s ease-in-out !important;
+  border-radius: 60px !important;
+}
+
+.overlay-panel {
+  position: absolute !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flexDirection: column !important;
+  padding: 0 40px !important;
+  text-align: center !important;
+  top: 0 !important;
+  height: 100% !important;
+  width: 50% !important;
+  transform: translateX(0) !important;
+  transition: transform 0.6s ease-in-out !important;
+}
+
+.overlay-right {
+  right: 0 !important;
+  transform: translateX(0) !important;
+}
+
+.overlay-left {
+  transform: translateX(-20%) !important;
+}
+
+.overlay-panel h2 {
+  margin: 0 0 20px 0 !important;
+  font-size: 28px !important;
+  font-weight: bold !important;
+}
+
+.overlay-panel p {
+  font-size: 14px !important;
+  font-weight: 100 !important;
+  line-height: 20px !important;
+  letter-spacing: 0.5px !important;
+  margin: 20px 0 25px !important;
+}
+
+.overlay-panel button {
+  border-radius: 20px !important;
+  border: 1px solid #fff !important;
+  background: transparent !important;
+  color: #fff !important;
+  font-size: 12px !important;
+  font-weight: bold !important;
+  padding: 14px 40px !important;
+  letter-spacing: 1px !important;
+  text-transform: uppercase !important;
+  transition: all 0.3s ease !important;
+  cursor: pointer !important;
+}
+
+.overlay-panel button:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 12px rgba(255, 255, 255, 0.2) !important;
+}
+
+.overlay-panel button:active {
+  transform: scale(0.98) !important;
+}
+
+.overlay-panel button:focus {
+  outline: none !important;
+}
+
+/* Animation */
+.form-container.right-panel-active .overlay-container {
+  transform: translateX(-100%) !important;
+}
+
+.form-container.right-panel-active .overlay {
+  transform: translateX(50%) !important;
+}
+
+.form-container.right-panel-active .overlay-left {
+  transform: translateX(0) !important;
+}
+
+.form-container.right-panel-active .overlay-right {
+  transform: translateX(20%) !important;
+}
+
+/* -------------------------------------------------
+   8. Mobile - Adjusted for smaller fonts
+   ------------------------------------------------- */
+@media (max-width: 768px) {
+  .form-container {
+    min-height: 100vh !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    width: 100% !important;
+  }
+
+  .form {
+    width: 100% !important;
+    height: auto !important;
+    position: relative !important;
+    padding: 40px 25px !important;
+  }
+
+  .register-form {
+    padding-top: 30px !important;
+    padding-bottom: 30px !important;
+  }
+
+  .overlay-container {
+    display: none !important;
+  }
+
+  .register-form {
+    top: 0 !important;
+    transform: translateX(0) !important;
+  }
+
+  .social-btn {
+    max-width: 180px !important;
+  }
+
+  .form h2 {
+    font-size: 24px !important;
+  }
+
+  .overlay-panel h2 {
+    font-size: 24px !important;
+  }
+}
+
+/* -------------------------------------------------
+ 9. Field Headers and Groups
+ ------------------------------------------------- */
+.field-group {
+  width: 100% !important;
+  margin: 8px 0 !important;
+  text-align: left !important;
+}
+
+.field-label {
+  display: block !important;
+  color: #333 !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  margin-bottom: 6px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+}
+
+/* Update existing input wrappers to work with field groups */
+.field-group .input-wrapper,
+.field-group .password-wrapper,
+.field-group .select-wrapper {
+  margin: 0 !important;
+}
+
+/* -------------------------------------------------
+   10. FULL SCREEN FIXES - CRITICAL
+   ------------------------------------------------- */
+html, body, #root {
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: #f6f5f7 !important;
+}
+
+.min-h-screen {
+  min-height: 100vh !important;
+  height: 100% !important;
+  background: #f6f5f7 !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.flex-grow {
+  flex: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+}
+
+/* Fix for mobile screens */
+@media (max-width: 768px) {
+  .auth-container {
+    min-height: 100vh !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  .form-container {
+    min-height: 100vh !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+  
+  .min-h-screen {
+    padding: 0 !important;
+  }
+}
