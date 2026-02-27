@@ -23,7 +23,7 @@ const Products = () => {
   const fetchProducts = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/products/products', {
+      const response = await fetch('/api/products/products', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -40,7 +40,7 @@ const Products = () => {
   const fetchCategories = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/products/categories', {
+      const response = await fetch('/api/products/categories', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
@@ -55,7 +55,7 @@ const Products = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/products/staff/products/${productId}`, {
+      const response = await fetch(`/api/products/staff/products/${productId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -115,7 +115,7 @@ const Products = () => {
       
       console.log('Sending update data:', dataToSend);
       
-      const response = await fetch(`http://localhost:5000/api/products/staff/products/${editingProduct}`, {
+      const response = await fetch(`/api/products/staff/products/${editingProduct}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -238,7 +238,7 @@ const Products = () => {
             <div className="h-48 bg-gray-100 relative overflow-hidden">
               {product.image_urls && product.image_urls.length > 0 ? (
                 <img 
-                src={`http://localhost:5000/api/uploads/products/${product.image_urls[0]?.split('/').pop()}`}
+                src={`/api/uploads/products/${product.image_urls[0]?.split('/').pop()}`}
                 alt={product.name}
                 className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
                 onError={(e) => {

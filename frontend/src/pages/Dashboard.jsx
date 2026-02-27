@@ -14,7 +14,12 @@ import {
   FaShoppingCart,
   FaUserFriends,
   FaWarehouse,
-  FaFileAlt
+  FaFileAlt,
+  FaMotorcycle, // NEW: for errand runner
+  FaCheckCircle, // NEW: for completed errands
+  FaTimesCircle, // NEW: for rejected errands
+  FaClock, // NEW: for pending errands
+  FaCamera
 } from 'react-icons/fa';
 
 const Dashboard = () => {
@@ -33,12 +38,19 @@ const Dashboard = () => {
     myPendingBatches: 0,
     totalBatches: 0,
     todayTransactions: 0,
-    rejectedCount: 0
+    rejectedCount: 0,
+    // NEW: Errand stats
+    pendingErrands: 0,
+    inProgressErrands: 0,
+    submittedErrands: 0,
+    rejectedErrands: 0,
+    completedErrands: 0,
+    totalEarnings: 0
   });
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  // Helper function to add auth token to requests
+  // Helper function to add auth token to requests - FIXED: using relative URLs
   const fetchWithAuth = async (url) => {
     const token = localStorage.getItem('token');
     return fetch(url, {
@@ -67,11 +79,10 @@ const Dashboard = () => {
     try {
       setLoading(true);
       
-      // ============ FIXED ENDPOINTS ============
-      // Use the correct endpoints that your Flask backend provides
+      // Common data fetch - FIXED: using relative URLs
       const [productsRes, todaySalesRes] = await Promise.all([
-        fetchWithAuth('http://localhost:5000/api/products/products?limit=5'),
-        fetchWithAuth('http://localhost:5000/api/sales/recent?limit=5')
+        fetchWithAuth('/api/products/products?limit=5'),
+        fetchWithAuth('/api/sales/recent?limit=5')
       ]);
 
       let roleSpecificStats = {};
@@ -91,6 +102,9 @@ const Dashboard = () => {
           break;
         case 'cashier':
           roleSpecificStats = await fetchCashierStats();
+          break;
+        case 'errand': // NEW: Errand runner role
+          roleSpecificStats = await fetchErrandStats();
           break;
         default:
           roleSpecificStats = {
@@ -134,10 +148,11 @@ const Dashboard = () => {
 
   const fetchAdminStats = async () => {
     try {
+      // FIXED: using relative URLs
       const [usersRes, pendingRes, lowStockRes] = await Promise.all([
-        fetchWithAuth('http://localhost:5000/api/auth/users/stats'),
-        fetchWithAuth('http://localhost:5000/api/receiving/batches/pending'),
-        fetchWithAuth('http://localhost:5000/api/products/low-stock?threshold=10')
+        fetchWithAuth('/api/auth/users/stats'),
+        fetchWithAuth('/api/receiving/batches/pending'),
+        fetchWithAuth('/api/products/low-stock?threshold=10')
       ]);
 
       return {
@@ -155,11 +170,12 @@ const Dashboard = () => {
 
   const fetchManagerStats = async () => {
     try {
+      // FIXED: using relative URLs
       const [pendingRes, lowStockRes, staffRes, salesRes] = await Promise.all([
-        fetchWithAuth('http://localhost:5000/api/receiving/batches/pending'),
-        fetchWithAuth('http://localhost:5000/api/products/low-stock?threshold=10'),
-        fetchWithAuth('http://localhost:5000/api/auth/users?role=cashier'),
-        fetchWithAuth('http://localhost:5000/api/sales/recent?limit=20')
+        fetchWithAuth('/api/receiving/batches/pending'),
+        fetchWithAuth('/api/products/low-stock?threshold=10'),
+        fetchWithAuth('/api/auth/users?role=cashier'),
+        fetchWithAuth('/api/sales/recent?limit=20')
       ]);
 
       return {
@@ -177,9 +193,10 @@ const Dashboard = () => {
 
   const fetchSeniorStats = async () => {
     try {
+      // FIXED: using relative URLs
       const [pendingRes, lowStockRes] = await Promise.all([
-        fetchWithAuth('http://localhost:5000/api/receiving/batches/pending'),
-        fetchWithAuth('http://localhost:5000/api/products/low-stock?threshold=10')
+        fetchWithAuth('/api/receiving/batches/pending'),
+        fetchWithAuth('/api/products/low-stock?threshold=10')
       ]);
       
       return {
@@ -193,8 +210,8 @@ const Dashboard = () => {
 
   const fetchReceiverStats = async () => {
     try {
-      // Fetch my batches with auth
-      const batchesRes = await fetchWithAuth('http://localhost:5000/api/receiving/my-batches');
+      // FIXED: using relative URLs
+      const batchesRes = await fetchWithAuth('/api/receiving/my-batches');
       console.log('My batches response:', batchesRes);
       
       const batches = batchesRes.batches || batchesRes.data?.batches || [];
@@ -202,10 +219,9 @@ const Dashboard = () => {
         ['draft', 'submitted'].includes(b.status)
       ).length || 0;
 
-      // Fetch rejected batches count with auth
       let rejectedCount = 0;
       try {
-        const rejectedRes = await fetchWithAuth('http://localhost:5000/api/receiving/my-rejected-batches');
+        const rejectedRes = await fetchWithAuth('/api/receiving/my-rejected-batches');
         console.log('Rejected batches response:', rejectedRes);
         const rejectedBatches = rejectedRes.batches || rejectedRes.data?.batches || [];
         rejectedCount = rejectedBatches.length || 0;
@@ -230,7 +246,8 @@ const Dashboard = () => {
 
   const fetchCashierStats = async () => {
     try {
-      const salesRes = await fetchWithAuth('http://localhost:5000/api/sales/recent?limit=20');
+      // FIXED: using relative URLs
+      const salesRes = await fetchWithAuth('/api/sales/recent?limit=20');
       const sales = salesRes.sales || salesRes.data?.sales || [];
       return {
         todayTransactions: sales.length || 0,
@@ -238,6 +255,60 @@ const Dashboard = () => {
       };
     } catch (error) {
       return { todayTransactions: 0, todayRevenue: 0 };
+    }
+  };
+
+  // NEW: Fetch errand runner stats
+  const fetchErrandStats = async () => {
+    try {
+      // FIXED: using relative URLs
+      const statsRes = await fetchWithAuth('/api/stats/runner');
+      console.log('Errand stats response:', statsRes);
+      
+      if (statsRes.success && statsRes.stats) {
+        return {
+          pendingErrands: statsRes.stats.pending || 0,
+          inProgressErrands: statsRes.stats.in_progress || 0,
+          submittedErrands: statsRes.stats.submitted || 0,
+          rejectedErrands: statsRes.stats.rejected || 0,
+          completedErrands: statsRes.stats.completed || 0,
+          totalEarnings: statsRes.stats.total_earnings || 0
+        };
+      }
+      
+      // Fallback to fetching my errands manually
+      const errandsRes = await fetchWithAuth('/api/errands/my');
+      const errands = errandsRes.errands || errandsRes.data?.errands || [];
+      
+      const pending = errands.filter(e => e.status === 'pending').length;
+      const inProgress = errands.filter(e => ['accepted', 'in_progress'].includes(e.status)).length;
+      const submitted = errands.filter(e => e.status === 'submitted').length;
+      const rejected = errands.filter(e => e.status === 'rejected').length;
+      const completed = errands.filter(e => ['approved', 'completed', 'paid'].includes(e.status)).length;
+      
+      // Calculate earnings from completed errands
+      const totalEarnings = errands
+        .filter(e => ['approved', 'completed', 'paid'].includes(e.status))
+        .reduce((sum, e) => sum + (e.errand_fee || 0), 0);
+      
+      return {
+        pendingErrands: pending,
+        inProgressErrands: inProgress,
+        submittedErrands: submitted,
+        rejectedErrands: rejected,
+        completedErrands: completed,
+        totalEarnings: totalEarnings
+      };
+    } catch (error) {
+      console.error('Failed to fetch errand stats:', error);
+      return { 
+        pendingErrands: 0, 
+        inProgressErrands: 0, 
+        submittedErrands: 0,
+        rejectedErrands: 0,
+        completedErrands: 0,
+        totalEarnings: 0 
+      };
     }
   };
 
@@ -250,6 +321,7 @@ const Dashboard = () => {
       senior: 'Senior Staff Dashboard',
       receiver: 'Receiver Dashboard',
       cashier: 'Cashier Dashboard',
+      errand: 'Errand Runner Dashboard', // NEW
       customer: 'Customer Dashboard'
     };
     
@@ -265,6 +337,7 @@ const Dashboard = () => {
       senior: 'Review and approve inventory batches for quality control.',
       receiver: 'Receive inventory batches from suppliers.',
       cashier: 'Process sales transactions and assist customers.',
+      errand: 'View and manage your assigned errands and deliveries.', // NEW
       customer: 'Browse products and place orders.'
     };
     
@@ -495,6 +568,66 @@ const Dashboard = () => {
           description: "Find products",
           action: () => navigate('/dashboard/products')
         }
+      ],
+      // NEW: Errand runner stats cards
+      errand: [
+        {
+          title: "Available Errands",
+          value: stats.pendingErrands?.toLocaleString() || '0',
+          icon: <FaMotorcycle className="text-2xl" />,
+          color: "blue",
+          trend: stats.pendingErrands > 0 ? `${stats.pendingErrands} available` : "None",
+          description: "Errands waiting to be accepted",
+          action: () => navigate('/errands/available'),
+          priority: stats.pendingErrands > 0
+        },
+        {
+          title: "In Progress",
+          value: stats.inProgressErrands?.toLocaleString() || '0',
+          icon: <FaClock className="text-2xl" />,
+          color: "orange",
+          trend: stats.inProgressErrands > 0 ? "Active" : "None",
+          description: "Errands you're working on",
+          action: () => navigate('/errands/active'),
+          priority: stats.inProgressErrands > 0
+        },
+        {
+          title: "Pending Approval",
+          value: stats.submittedErrands?.toLocaleString() || '0',
+          icon: <FaClipboardCheck className="text-2xl" />,
+          color: "purple",
+          trend: stats.submittedErrands > 0 ? "Awaiting review" : "None",
+          description: "Submitted for approval",
+          action: () => navigate('/errands/submitted')
+        },
+        {
+          title: "Rejected",
+          value: stats.rejectedErrands?.toLocaleString() || '0',
+          icon: <FaTimesCircle className="text-2xl" />,
+          color: "red",
+          trend: stats.rejectedErrands > 0 ? "Needs attention" : "All clear",
+          description: "Errands needing revision",
+          action: () => navigate('/errands/rejected'),
+          priority: stats.rejectedErrands > 0
+        },
+        {
+          title: "Completed",
+          value: stats.completedErrands?.toLocaleString() || '0',
+          icon: <FaCheckCircle className="text-2xl" />,
+          color: "green",
+          trend: "Done",
+          description: "Successfully completed",
+          action: () => navigate('/errands/completed')
+        },
+        {
+          title: "Total Earnings",
+          value: `KSh ${(stats.totalEarnings || 0).toLocaleString()}`,
+          icon: <FaChartBar className="text-2xl" />,
+          color: "green",
+          trend: stats.completedErrands > 0 ? "Paid" : "No earnings",
+          description: "From completed errands",
+          action: () => navigate('/errands/earnings')
+        }
       ]
     };
 
@@ -608,6 +741,43 @@ const Dashboard = () => {
           path: '/dashboard/customers',
           description: 'Manage customers'
         }
+      ],
+      // NEW: Errand runner quick actions
+      errand: [
+        { 
+          label: 'Available Errands', 
+          icon: <FaMotorcycle />, 
+          path: '/errands/available',
+          description: 'View and accept new errands',
+          priority: stats.pendingErrands > 0
+        },
+        { 
+          label: 'My Active Errands', 
+          icon: <FaClock />, 
+          path: '/errands/active',
+          description: 'Continue working on errands',
+          priority: stats.inProgressErrands > 0
+        },
+        { 
+          label: 'Submit Proof', 
+          icon: <FaCamera />, 
+          path: '/errands/submit',
+          description: 'Upload photos and receipts',
+          priority: stats.submittedErrands === 0 && stats.inProgressErrands > 0
+        },
+        { 
+          label: 'Rejected', 
+          icon: <FaTimesCircle />, 
+          path: '/errands/rejected',
+          description: 'Fix and resubmit',
+          priority: stats.rejectedErrands > 0
+        },
+        { 
+          label: 'My Earnings', 
+          icon: <FaChartBar />, 
+          path: '/errands/earnings',
+          description: `KSh ${(stats.totalEarnings || 0).toLocaleString()} total`
+        }
       ]
     };
 
@@ -642,16 +812,17 @@ const Dashboard = () => {
             user.role === 'senior' ? 'bg-orange-100 text-orange-800' :
             user.role === 'receiver' ? 'bg-green-100 text-green-800' :
             user.role === 'cashier' ? 'bg-emerald-100 text-emerald-800' :
+            user.role === 'errand' ? 'bg-yellow-100 text-yellow-800' : // NEW
             'bg-gray-100 text-gray-800'
           }`}>
-            {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+            {user.role === 'errand' ? 'Errand Runner' : (user.role?.charAt(0).toUpperCase() + user.role?.slice(1))}
           </span>
         )}
       </div>
 
       {/* Stats Grid */}
       {statsCards.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-${statsCards.length === 6 ? '3' : '4'} gap-6`}>
           {statsCards.map((card, index) => (
             <StatsCard
               key={index}
@@ -671,7 +842,7 @@ const Dashboard = () => {
       {quickActions.length > 0 && (
         <div className="bg-white rounded-xl shadow p-6">
           <h2 className="text-xl font-semibold mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {quickActions.map((action, index) => (
               <button
                 key={index}
@@ -695,102 +866,104 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Recent Activity Section */}
-      <div className="bg-white rounded-xl shadow p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold">Recent Activity</h2>
-          <button 
-            onClick={() => window.location.reload()}
-            className="text-sm text-blue-600 hover:text-blue-800"
-          >
-            Refresh
-          </button>
+      {/* Recent Activity Section - Only show for non-errand roles */}
+      {user?.role !== 'errand' && (
+        <div className="bg-white rounded-xl shadow p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold">Recent Activity</h2>
+            <button 
+              onClick={() => window.location.reload()}
+              className="text-sm text-blue-600 hover:text-blue-800"
+            >
+              Refresh
+            </button>
+          </div>
+          
+          <div className="space-y-4">
+            {/* Recent Products */}
+            {stats.products && stats.products.length > 0 && (
+              <div className="border rounded-lg p-4">
+                <h3 className="font-medium text-gray-700 mb-2">Recently Added Products</h3>
+                <div className="space-y-2">
+                  {stats.products.slice(0, 3).map((product, index) => (
+                    <div key={product.id || index} className="flex justify-between items-center py-2 border-b last:border-0">
+                      <div>
+                        <p className="font-medium">{product.name || `Product ${index + 1}`}</p>
+                        <p className="text-sm text-gray-500">SKU: {product.sku || 'N/A'}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold">KSh {parseFloat(product.price || 0).toLocaleString()}</p>
+                        <p className={`text-sm ${(product.stock_quantity || 0) <= (product.min_stock_level || 10) ? 'text-red-600' : 'text-green-600'}`}>
+                          Stock: {product.stock_quantity || 0}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Today's Sales for Cashiers/Managers */}
+            {(user?.role === 'cashier' || user?.role === 'manager') && stats.todaySales && stats.todaySales.length > 0 && (
+              <div className="border rounded-lg p-4">
+                <h3 className="font-medium text-gray-700 mb-2">Today's Sales</h3>
+                <div className="space-y-2">
+                  {stats.todaySales.slice(0, 3).map((sale, index) => (
+                    <div key={sale.id || index} className="flex justify-between items-center py-2 border-b last:border-0">
+                      <div>
+                        <p className="font-medium">Sale #{sale.id || index + 1}</p>
+                        <p className="text-sm text-gray-500">{sale.customer_name || 'Walk-in customer'}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold">KSh {parseFloat(sale.total_amount || 0).toLocaleString()}</p>
+                        <p className="text-sm text-gray-500">
+                          {sale.created_at ? new Date(sale.created_at).toLocaleTimeString() : 'Today'}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Pending Batches for Senior/Manager */}
+            {(user?.role === 'senior' || user?.role === 'manager' || user?.role === 'admin') && stats.pendingBatches > 0 && (
+              <div className="border border-yellow-200 bg-yellow-50 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <FaExclamationTriangle className="text-yellow-600" />
+                  <h3 className="font-medium text-yellow-800">Action Required</h3>
+                </div>
+                <p className="text-yellow-700">
+                  You have {stats.pendingBatches} batch{stats.pendingBatches !== 1 ? 'es' : ''} pending review.
+                </p>
+                <button
+                  onClick={() => navigate('/inventory/approval')}
+                  className="mt-2 px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 text-sm"
+                >
+                  Review Now
+                </button>
+              </div>
+            )}
+
+            {/* Empty State */}
+            {(!stats.products || stats.products.length === 0) && 
+             (!stats.todaySales || stats.todaySales.length === 0) && 
+             stats.pendingBatches === 0 && (
+              <div className="border rounded-lg p-8 text-center">
+                <FaChartBar className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-700 mb-2">No Recent Activity</h3>
+                <p className="text-gray-500 mb-4">Start by creating your first batch or making a sale</p>
+                <button
+                  onClick={() => navigate(user?.role === 'receiver' ? '/inventory/receiving?new=true' : '/dashboard/products')}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  Get Started
+                </button>
+              </div>
+            )}
+          </div>
         </div>
-        
-        <div className="space-y-4">
-          {/* Recent Products */}
-          {stats.products && stats.products.length > 0 && (
-            <div className="border rounded-lg p-4">
-              <h3 className="font-medium text-gray-700 mb-2">Recently Added Products</h3>
-              <div className="space-y-2">
-                {stats.products.slice(0, 3).map((product, index) => (
-                  <div key={product.id || index} className="flex justify-between items-center py-2 border-b last:border-0">
-                    <div>
-                      <p className="font-medium">{product.name || `Product ${index + 1}`}</p>
-                      <p className="text-sm text-gray-500">SKU: {product.sku || 'N/A'}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold">KSh {parseFloat(product.price || 0).toLocaleString()}</p>
-                      <p className={`text-sm ${(product.stock_quantity || 0) <= (product.min_stock_level || 10) ? 'text-red-600' : 'text-green-600'}`}>
-                        Stock: {product.stock_quantity || 0}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Today's Sales for Cashiers/Managers */}
-          {(user?.role === 'cashier' || user?.role === 'manager') && stats.todaySales && stats.todaySales.length > 0 && (
-            <div className="border rounded-lg p-4">
-              <h3 className="font-medium text-gray-700 mb-2">Today's Sales</h3>
-              <div className="space-y-2">
-                {stats.todaySales.slice(0, 3).map((sale, index) => (
-                  <div key={sale.id || index} className="flex justify-between items-center py-2 border-b last:border-0">
-                    <div>
-                      <p className="font-medium">Sale #{sale.id || index + 1}</p>
-                      <p className="text-sm text-gray-500">{sale.customer_name || 'Walk-in customer'}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold">KSh {parseFloat(sale.total_amount || 0).toLocaleString()}</p>
-                      <p className="text-sm text-gray-500">
-                        {sale.created_at ? new Date(sale.created_at).toLocaleTimeString() : 'Today'}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Pending Batches for Senior/Manager */}
-          {(user?.role === 'senior' || user?.role === 'manager' || user?.role === 'admin') && stats.pendingBatches > 0 && (
-            <div className="border border-yellow-200 bg-yellow-50 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <FaExclamationTriangle className="text-yellow-600" />
-                <h3 className="font-medium text-yellow-800">Action Required</h3>
-              </div>
-              <p className="text-yellow-700">
-                You have {stats.pendingBatches} batch{stats.pendingBatches !== 1 ? 'es' : ''} pending review.
-              </p>
-              <button
-                onClick={() => navigate('/inventory/approval')}
-                className="mt-2 px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 text-sm"
-              >
-                Review Now
-              </button>
-            </div>
-          )}
-
-          {/* Empty State */}
-          {(!stats.products || stats.products.length === 0) && 
-           (!stats.todaySales || stats.todaySales.length === 0) && 
-           stats.pendingBatches === 0 && (
-            <div className="border rounded-lg p-8 text-center">
-              <FaChartBar className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-700 mb-2">No Recent Activity</h3>
-              <p className="text-gray-500 mb-4">Start by creating your first batch or making a sale</p>
-              <button
-                onClick={() => navigate(user?.role === 'receiver' ? '/inventory/receiving?new=true' : '/dashboard/products')}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                Get Started
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
+      )}
     </div>
   );
 };

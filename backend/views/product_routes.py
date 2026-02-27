@@ -1,4 +1,4 @@
-# ~/hnj/backend/views/product_routes.py - COMPLETE FIXED WITH PRICE MAPPING AND SUBCATEGORY FIX
+# ~/hnj/backend/views/product_routes.py - COMPLETE WITH VIDEO UPLOAD SUPPORT
 import os
 import uuid
 from datetime import datetime
@@ -11,12 +11,18 @@ from models import Product, ProductCategory, ProductSubCategory, User
 product_bp = Blueprint('products', __name__)
 
 # Configure upload settings
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
-MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file size
+ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+ALLOWED_VIDEO_EXTENSIONS = {'mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'}
+MAX_IMAGE_SIZE = 16 * 1024 * 1024  # 16MB max file size for images
+MAX_VIDEO_SIZE = 50 * 1024 * 1024  # 50MB max file size for videos
 
-def allowed_file(filename):
+def allowed_image_file(filename):
     return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_IMAGE_EXTENSIONS
+
+def allowed_video_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_VIDEO_EXTENSIONS
 
 def create_upload_folder(folder_name):
     """Create upload folder if it doesn't exist - use Flask's app context"""
@@ -116,7 +122,7 @@ def test_file_access(filename):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# ==================== UPLOAD ENDPOINTS ====================
+# ==================== IMAGE UPLOAD ENDPOINTS ====================
 
 @product_bp.route('/upload', methods=['POST'])
 @jwt_required()
@@ -141,7 +147,7 @@ def upload_image():
             return jsonify({'error': 'No file selected'}), 400
         
         # Validate file
-        if not allowed_file(file.filename):
+        if not allowed_image_file(file.filename):
             return jsonify({'error': 'File type not allowed. Allowed types: PNG, JPG, JPEG, GIF, WEBP'}), 400
         
         # Get folder name (default to 'products')
@@ -228,7 +234,7 @@ def upload_multiple_images():
                 continue
             
             # Validate file
-            if not allowed_file(file.filename):
+            if not allowed_image_file(file.filename):
                 print(f"DEBUG: Skipping invalid file: {file.filename}")
                 continue
             
@@ -270,6 +276,190 @@ def upload_multiple_images():
         
     except Exception as e:
         print(f"ERROR in multiple upload: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+# ==================== VIDEO UPLOAD ENDPOINTS ====================
+
+@product_bp.route('/upload/video', methods=['POST'])
+@jwt_required()
+def upload_single_video():
+    """Upload a single video file"""
+    try:
+        print("\n" + "="*50)
+        print("DEBUG: Video upload endpoint called")
+        
+        # Check if file exists in request
+        if 'video' not in request.files:
+            return jsonify({'error': 'No video file provided'}), 400
+        
+        file = request.files['video']
+        print(f"DEBUG: Received file: {file.filename}")
+        print(f"DEBUG: File content type: {file.content_type}")
+        file.seek(0)
+        
+        # Check if file was selected
+        if file.filename == '':
+            return jsonify({'error': 'No video selected'}), 400
+        
+        # Validate file type
+        if not allowed_video_file(file.filename):
+            return jsonify({'error': 'Invalid video format. Allowed: mp4, webm, ogg, mov, avi, mkv'}), 400
+        
+        # Check file size (approximate by seeking to end and back)
+        file.seek(0, 2)
+        file_size = file.tell()
+        file.seek(0)
+        
+        if file_size > MAX_VIDEO_SIZE:
+            return jsonify({'error': f'Video too large. Max size: {MAX_VIDEO_SIZE // (1024*1024)}MB'}), 400
+        
+        # Get folder name (default to 'product_videos')
+        folder = request.form.get('folder', 'product_videos')
+        print(f"DEBUG: Upload folder: {folder}")
+        
+        # Secure the filename and create unique name
+        original_filename = secure_filename(file.filename)
+        file_extension = original_filename.rsplit('.', 1)[1].lower() if '.' in original_filename else 'mp4'
+        
+        # Generate unique filename with timestamp
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        unique_id = str(uuid.uuid4())[:8]
+        new_filename = f"video_{timestamp}_{unique_id}.{file_extension}"
+        print(f"DEBUG: Generated filename: {new_filename}")
+        
+        # Create folder if it doesn't exist
+        upload_folder = create_upload_folder(folder)
+        
+        # Save file
+        file_path = os.path.join(upload_folder, new_filename)
+        print(f"DEBUG: Saving to: {file_path}")
+        
+        file.save(file_path)
+        
+        # Verify file was saved
+        if os.path.exists(file_path):
+            saved_size = os.path.getsize(file_path)
+            print(f"DEBUG: Video saved successfully! Size: {saved_size} bytes")
+        else:
+            print("DEBUG: ERROR - Video not saved!")
+            return jsonify({'error': 'Video failed to save'}), 500
+        
+        # Return relative URL for frontend
+        video_url = f"/api/uploads/{folder}/{new_filename}"
+        print(f"DEBUG: Video URL: {video_url}")
+        print("="*50 + "\n")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Video uploaded successfully',
+            'videoUrl': video_url,
+            'filename': new_filename,
+            'size': saved_size
+        }), 200
+        
+    except Exception as e:
+        print(f"ERROR in video upload: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@product_bp.route('/upload/videos', methods=['POST'])
+@jwt_required()
+def upload_multiple_videos():
+    """Upload multiple video files"""
+    try:
+        print("\n" + "="*50)
+        print("DEBUG: Multiple video upload endpoint called")
+        
+        # Check if files exist in request
+        if 'videos' not in request.files:
+            return jsonify({'error': 'No video files provided'}), 400
+        
+        files = request.files.getlist('videos')
+        print(f"DEBUG: Received {len(files)} video files")
+        
+        # Check if files were selected
+        if len(files) == 0:
+            return jsonify({'error': 'No videos selected'}), 400
+        
+        # Get folder name (default to 'product_videos')
+        folder = request.form.get('folder', 'product_videos')
+        
+        # Create folder if it doesn't exist
+        upload_folder = create_upload_folder(folder)
+        
+        uploaded_urls = []
+        failed_uploads = []
+        
+        for file in files:
+            if file.filename == '':
+                continue
+            
+            # Validate file type
+            if not allowed_video_file(file.filename):
+                failed_uploads.append(f"{file.filename} (invalid format)")
+                continue
+            
+            # Check file size
+            file.seek(0, 2)
+            file_size = file.tell()
+            file.seek(0)
+            
+            if file_size > MAX_VIDEO_SIZE:
+                failed_uploads.append(f"{file.filename} (too large - {file_size // (1024*1024)}MB)")
+                continue
+            
+            # Secure the filename and create unique name
+            original_filename = secure_filename(file.filename)
+            file_extension = original_filename.rsplit('.', 1)[1].lower() if '.' in original_filename else 'mp4'
+            
+            # Generate unique filename with timestamp
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            unique_id = str(uuid.uuid4())[:8]
+            new_filename = f"video_{timestamp}_{unique_id}.{file_extension}"
+            
+            # Save file
+            file_path = os.path.join(upload_folder, new_filename)
+            file.save(file_path)
+            
+            # Verify save
+            if os.path.exists(file_path):
+                saved_size = os.path.getsize(file_path)
+                print(f"DEBUG: Saved video: {new_filename} ({saved_size} bytes)")
+            else:
+                failed_uploads.append(f"{original_filename} (save failed)")
+                continue
+            
+            # Add to uploaded URLs
+            video_url = f"/api/uploads/{folder}/{new_filename}"
+            uploaded_urls.append(video_url)
+        
+        response = {
+            'success': True,
+            'message': f'Successfully uploaded {len(uploaded_urls)} videos',
+            'videoUrls': uploaded_urls
+        }
+        
+        if failed_uploads:
+            response['failed'] = failed_uploads
+            response['message'] += f', {len(failed_uploads)} failed'
+        
+        if len(uploaded_urls) == 0:
+            response['success'] = False
+            response['message'] = 'No videos were uploaded successfully'
+            return jsonify(response), 400
+        
+        print(f"DEBUG: Successfully uploaded {len(uploaded_urls)} videos")
+        if failed_uploads:
+            print(f"DEBUG: Failed uploads: {failed_uploads}")
+        print("="*50 + "\n")
+        
+        return jsonify(response), 200
+        
+    except Exception as e:
+        print(f"ERROR in multiple video upload: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
@@ -903,7 +1093,7 @@ def create_product():
             name=data['name'],
             description=data.get('description', ''),
             category_id=data['category_id'],
-            subcategory_id=subcategory_id,  # FIXED: Now None instead of ''
+            subcategory_id=subcategory_id,
             price=selling_price,
             selling_price=selling_price,
             cost_price=data.get('cost_price'),
@@ -911,6 +1101,7 @@ def create_product():
             min_stock_level=data.get('min_stock_level', 10),
             barcode=data.get('barcode'),
             image_urls=data.get('image_urls', []),
+            video_urls=data.get('video_urls', []),  # Added video support
             specifications=data.get('specifications', {}),
             is_on_offer=data.get('is_on_offer', False),
             offer_price=data.get('offer_price'),
@@ -940,7 +1131,7 @@ def create_product():
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'message': str(e)}), 500
-    
+
 @product_bp.route('/staff/products/<int:product_id>', methods=['PUT'])
 @jwt_required()
 def update_product(product_id):
@@ -975,7 +1166,7 @@ def update_product(product_id):
         updatable_fields = [
             'name', 'description', 'category_id', 'subcategory_id',
             'cost_price', 'stock_quantity', 'min_stock_level',
-            'barcode', 'image_urls', 'specifications', 'is_active',
+            'barcode', 'image_urls', 'video_urls', 'specifications', 'is_active',
             'is_on_offer', 'offer_price', 'discount_percentage',
             'brand', 'model', 'color', 'size', 'material', 'unit_of_measure'
         ]
@@ -1125,6 +1316,30 @@ def search_products():
         current_app.logger.error(f"Search products error: {str(e)}")
         return jsonify({'success': False, 'message': 'Failed to search products'}), 500
 
+# ==================== SERVE UPLOADS ====================
+
+@product_bp.route('/uploads/<path:filename>')
+def serve_upload(filename):
+    """Serve uploaded files"""
+    try:
+        return send_from_directory(
+            os.path.join(current_app.root_path, 'static', 'uploads'),
+            filename
+        )
+    except Exception as e:
+        return jsonify({'error': str(e)}), 404
+
+@product_bp.route('/uploads/<folder>/<path:filename>')
+def serve_folder_upload(folder, filename):
+    """Serve uploaded files from specific folder"""
+    try:
+        return send_from_directory(
+            os.path.join(current_app.root_path, 'static', 'uploads', folder),
+            filename
+        )
+    except Exception as e:
+        return jsonify({'error': str(e)}), 404
+
 # Error handlers
 @product_bp.errorhandler(404)
 def not_found(error):
@@ -1134,5 +1349,3 @@ def not_found(error):
 def internal_error(error):
     current_app.logger.error(f'Server Error: {error}')
     return jsonify({'success': False, 'message': 'Internal server error'}), 500
-
-

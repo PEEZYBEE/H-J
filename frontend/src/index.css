@@ -923,3 +923,97 @@ select:-webkit-autofill:focus {
     transform: translateX(0);
   }
 }
+
+
+
+/* Special styling for Runner Performance link */
+.hnj-nav-performance {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  color: white !important;
+  margin: 4px 0;
+}
+
+.hnj-nav-performance:hover {
+  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%) !important;
+  transform: translateX(5px);
+}
+
+.hnj-nav-performance.active {
+  background: linear-gradient(135deg, #5a67d8 0%, #6b46a0 100%) !important;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+
+
+
+/* Auto-scrolling carousel animations */
+@keyframes scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(calc(-250px * 7));
+  }
+}
+
+.slider {
+  background: white;
+  box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.125);
+  height: 100px;
+  margin: auto;
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+
+.slider::before,
+.slider::after {
+  background: linear-gradient(to right, white 0%, rgba(255, 255, 255, 0) 100%);
+  content: "";
+  height: 100px;
+  position: absolute;
+  width: 200px;
+  z-index: 2;
+}
+
+.slider::after {
+  right: 0;
+  top: 0;
+  transform: rotateZ(180deg);
+}
+
+.slider::before {
+  left: 0;
+  top: 0;
+}
+
+.slider-track {
+  animation: scroll 40s linear infinite;
+  display: flex;
+  width: calc(250px * 14);
+}
+
+.slide {
+  height: 100px;
+  width: 250px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 15px;
+  perspective: 100px;
+}
+
+.slide-content {
+  transition: transform 0.5s;
+}
+
+.slide:hover .slide-content {
+  transform: translateZ(20px);
+}
+
+/* Pause animation on hover */
+.slider-track:hover {
+  animation-play-state: paused;
+}
+

@@ -1,4 +1,4 @@
-// src/website/pages/OrderConfirmationPage.jsx - COMPLETE VERSION
+// src/website/pages/OrderConfirmationPage.jsx - COMPLETE VERSION WITH RELATIVE URLS
 import React, { useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
@@ -6,6 +6,9 @@ import {
   FaHome, FaShoppingBag, FaReceipt, FaPhone,
   FaTruck, FaBox, FaClock, FaUser
 } from 'react-icons/fa';
+
+// Local placeholder data URI (no external dependencies)
+const PLACEHOLDER_IMAGE = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'64\' height=\'64\' viewBox=\'0 0 64 64\'%3E%3Crect width=\'64\' height=\'64\' fill=\'%23f0f0f0\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' dominant-baseline=\'middle\' text-anchor=\'middle\' font-family=\'Arial\' font-size=\'14\' fill=\'%23999\'%3ENo Image%3C/text%3E%3C/svg%3E';
 
 const OrderConfirmationPage = () => {
   const location = useLocation();
@@ -122,6 +125,12 @@ const OrderConfirmationPage = () => {
     window.URL.revokeObjectURL(url);
   };
 
+  // Calculate item price helper
+  const getItemPrice = (item) => {
+    if (!item) return 0;
+    return parseFloat(item.price || item.selling_price || 0) || 0;
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 py-12">
       <div className="container mx-auto px-4">
@@ -230,20 +239,21 @@ const OrderConfirmationPage = () => {
                 </h3>
                 <div className="border rounded-lg divide-y">
                   {orderItems.map((item, index) => {
-                    const itemPrice = formatCurrency(item.price || item.selling_price);
-                    const itemTotal = formatCurrency((item.price || item.selling_price || 0) * (item.quantity || 1));
+                    const itemPrice = formatCurrency(getItemPrice(item));
+                    const itemTotal = formatCurrency(getItemPrice(item) * (item.quantity || 1));
                     
                     return (
                       <div key={index} className="p-4 flex items-center gap-4">
                         <div className="w-16 h-16 bg-gray-100 rounded overflow-hidden flex-shrink-0">
                           {item.image_urls && item.image_urls[0] ? (
                             <img 
-                              src={`http://localhost:5000/api/uploads/products/${item.image_urls[0].split('/').pop()}`}
+                              // FIXED: Using relative URL instead of localhost
+                              src={`/api/uploads/products/${item.image_urls[0].split('/').pop()}`}
                               alt={item.name}
                               className="w-full h-full object-cover"
                               onError={(e) => {
                                 e.target.onerror = null;
-                                e.target.src = 'https://via.placeholder.com/64x64?text=No+Image';
+                                e.target.src = PLACEHOLDER_IMAGE;
                               }}
                             />
                           ) : (

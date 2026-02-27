@@ -1,5 +1,5 @@
-// src/website/pages/CheckoutPage.jsx - FIXED with safe price formatting
-import React, { useState, useMemo } from 'react';
+// src/website/pages/CheckoutPage.jsx - FIXED with debugging and proper total calculation
+import React, { useState, useMemo, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
   FaArrowLeft, FaCreditCard, FaMapMarkerAlt, FaUser, 
@@ -8,7 +8,8 @@ import {
 } from 'react-icons/fa';
 import { useCart } from '../context/CartContext';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+// Local placeholder data URI (no external dependencies)
+const PLACEHOLDER_IMAGE = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'48\' height=\'48\' viewBox=\'0 0 48 48\'%3E%3Crect width=\'48\' height=\'48\' fill=\'%23f0f0f0\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' dominant-baseline=\'middle\' text-anchor=\'middle\' font-family=\'Arial\' font-size=\'12\' fill=\'%23999\'%3ENo Image%3C/text%3E%3C/svg%3E';
 
 const CheckoutPage = () => {
   const navigate = useNavigate();
@@ -45,6 +46,41 @@ const CheckoutPage = () => {
     }
     return 0;
   };
+
+  // Calculate total manually to ensure it's correct
+  const calculateManualTotal = () => {
+    if (!cartItems || cartItems.length === 0) return 0;
+    
+    return cartItems.reduce((total, item) => {
+      const price = getItemPrice(item);
+      const quantity = item.quantity || 1;
+      return total + (price * quantity);
+    }, 0);
+  };
+
+  // Get total from context and also calculate manually
+  const contextTotal = parseFloat(getCartTotal()) || 0;
+  const manualTotal = calculateManualTotal();
+  
+  // Use the manual total if context total is 0 but items exist
+  const total = manualTotal > 0 ? manualTotal : contextTotal;
+
+  // Debug logging
+  useEffect(() => {
+    console.log('🛒 Checkout Page - Cart Items:', cartItems);
+    console.log('💰 Context Total:', contextTotal);
+    console.log('💰 Manual Total:', manualTotal);
+    console.log('💰 Using Total:', total);
+    
+    cartItems.forEach((item, index) => {
+      console.log(`Item ${index}:`, {
+        name: item.name,
+        price: getItemPrice(item),
+        quantity: item.quantity,
+        total: getItemPrice(item) * (item.quantity || 1)
+      });
+    });
+  }, [cartItems, contextTotal, manualTotal, total]);
 
   // Form states
   const [customerInfo, setCustomerInfo] = useState({
@@ -113,9 +149,6 @@ const CheckoutPage = () => {
       agent.toLowerCase().includes(searchTerm)
     );
   }, [agentSearch, mtaaniAgents]);
-
-  // Calculate totals safely
-  const total = parseFloat(getCartTotal()) || 0;
 
   const handleCustomerInfoChange = (e) => {
     const { name, value } = e.target;
@@ -212,10 +245,11 @@ const CheckoutPage = () => {
         items: orderItems
       };
   
-      console.log('📦 Sending order to:', `${API_BASE_URL}/orders/orders`);
+      console.log('📦 Sending order to:', '/api/orders/orders');
       console.log('📦 Order payload:', orderPayload);
   
-      const response = await fetch(`${API_BASE_URL}/orders/orders`, {
+      // FIXED: Using relative URL instead of localhost
+      const response = await fetch('/api/orders/orders', {
         method: 'POST',
         headers: headers,
         body: JSON.stringify(orderPayload)
@@ -268,6 +302,12 @@ const CheckoutPage = () => {
     const phoneRegex = /^0[17]\d{8}$/;
     if (!phoneRegex.test(customerInfo.phone.replace(/\s/g, ''))) {
       setError('Please enter a valid Kenyan phone number (e.g., 0712345678)');
+      return;
+    }
+
+    // Check if total is valid
+    if (total <= 0) {
+      setError('Invalid order total. Please check your cart.');
       return;
     }
 
@@ -684,9 +724,9 @@ const CheckoutPage = () => {
               <div className="sticky bottom-0 bg-white p-4 rounded-lg shadow-lg">
                 <button
                   type="submit"
-                  disabled={isProcessing || cartItems.length === 0}
+                  disabled={isProcessing || cartItems.length === 0 || total <= 0}
                   className={`w-full py-4 rounded-lg font-bold text-white flex items-center justify-center gap-2 ${
-                    isProcessing || cartItems.length === 0
+                    isProcessing || cartItems.length === 0 || total <= 0
                       ? 'bg-gray-400 cursor-not-allowed'
                       : 'bg-red-600 hover:bg-red-700'
                   }`}
@@ -715,7 +755,7 @@ const CheckoutPage = () => {
             <div className="bg-white rounded-lg shadow-md p-6 sticky top-4">
               <h2 className="text-xl font-bold text-gray-900 mb-6 pb-4 border-b">Order Summary</h2>
               
-              {/* Cart Items Preview - FIXED with safe formatting */}
+              {/* Cart Items Preview - FIXED with safe formatting and relative URL */}
               <div className="mb-6">
                 <h3 className="font-semibold text-gray-900 mb-3">Items ({getTotalItems()})</h3>
                 <div className="space-y-3 max-h-64 overflow-y-auto">
@@ -728,12 +768,13 @@ const CheckoutPage = () => {
                         <div className="w-12 h-12 flex-shrink-0">
                           {item.image_urls && item.image_urls.length > 0 ? (
                             <img 
-                              src={`${API_BASE_URL}/uploads/products/${item.image_urls[0]?.split('/').pop()}`}
+                              // FIXED: Using relative URL instead of localhost
+                              src={`/api/uploads/products/${item.image_urls[0]?.split('/').pop()}`}
                               alt={item.name}
                               className="w-full h-full object-cover rounded"
                               onError={(e) => {
                                 e.target.onerror = null;
-                                e.target.src = 'https://via.placeholder.com/48x48?text=No+Image';
+                                e.target.src = PLACEHOLDER_IMAGE;
                               }}
                             />
                           ) : (

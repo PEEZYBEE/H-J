@@ -1,7 +1,7 @@
-// src/services/api.js - COMPLETE FIXED VERSION WITH ALL EXPORTS
+// src/services/api.js - COMPLETE FIXED VERSION WITH VIDEO UPLOADS
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = '/api';
 
 // Create axios instance with base URL
 const api = axios.create({
@@ -157,6 +157,35 @@ export const productsAPI = {
   },
   classifyProduct: async (classificationData) => {
     const response = await api.post('/products/products/classify', classificationData);
+    return response.data;
+  },
+  
+  // ===== NEW: VIDEO UPLOAD METHODS =====
+  uploadVideo: async (videoFile, folder = 'product_videos') => {
+    const formData = new FormData();
+    formData.append('video', videoFile);
+    formData.append('folder', folder);
+    
+    const response = await api.post('/products/upload/video', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  uploadVideos: async (videoFiles, folder = 'product_videos') => {
+    const formData = new FormData();
+    videoFiles.forEach(file => {
+      formData.append('videos', file);
+    });
+    formData.append('folder', folder);
+    
+    const response = await api.post('/products/upload/videos', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
     return response.data;
   },
 };
@@ -518,6 +547,9 @@ export const getTopSellingProducts = productsAPI.getTopSellingProducts;
 export const getLowStockProducts = productsAPI.getLowStockProducts;
 export const updateInventory = productsAPI.updateInventory;
 export const classifyProduct = productsAPI.classifyProduct;
+// ===== NEW: Video upload exports =====
+export const uploadVideo = productsAPI.uploadVideo;
+export const uploadVideos = productsAPI.uploadVideos;
 
 // Inventory exports
 export const getAllInventory = inventoryAPI.getAllInventory;
@@ -600,6 +632,148 @@ export const updateStoreSettings = settingsAPI.updateStoreSettings;
 export const getTaxRates = settingsAPI.getTaxRates;
 export const updateTaxRate = settingsAPI.updateTaxRate;
 export const getPaymentMethods = settingsAPI.getPaymentMethods;
+
+
+
+
+// ========== ERRAND & DROPSHIPPING API ==========
+export const errandAPI = {
+  // Delivery Agents
+  getDeliveryAgents: async () => {
+    const response = await api.get('/delivery-agents');
+    return response.data;
+  },
+  createDeliveryAgent: async (agentData) => {
+    const response = await api.post('/delivery-agents', agentData);
+    return response.data;
+  },
+  updateDeliveryAgent: async (agentId, agentData) => {
+    const response = await api.put(`/delivery-agents/${agentId}`, agentData);
+    return response.data;
+  },
+  getAgentBranches: async (agentId) => {
+    const response = await api.get(`/delivery-agents/${agentId}/branches`);
+    return response.data;
+  },
+
+  // Errands
+  getErrands: async (params = {}) => {
+    const response = await api.get('/errands', { params });
+    return response.data;
+  },
+  getMyErrands: async () => {
+    const response = await api.get('/errands/my');
+    return response.data;
+  },
+  getPendingErrands: async () => {
+    const response = await api.get('/errands/pending');
+    return response.data;
+  },
+  getErrand: async (errandId) => {
+    const response = await api.get(`/errands/${errandId}`);
+    return response.data;
+  },
+  createErrand: async (errandData) => {
+    const response = await api.post('/errands', errandData);
+    return response.data;
+  },
+  assignErrand: async (errandId, runnerId) => {
+    const response = await api.post(`/errands/${errandId}/assign`, { runner_id: runnerId });
+    return response.data;
+  },
+  acceptErrand: async (errandId) => {
+    const response = await api.post(`/errands/${errandId}/accept`);
+    return response.data;
+  },
+  startErrand: async (errandId) => {
+    const response = await api.post(`/errands/${errandId}/start`);
+    return response.data;
+  },
+  setErrandDeadline: async (errandId, deadline) => {
+    const response = await api.post(`/errands/${errandId}/deadline`, { deadline });
+    return response.data;
+  },
+
+  // Submissions
+  submitErrand: async (errandId, formData) => {
+    const response = await api.post(`/errands/${errandId}/submissions`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+  deleteSubmission: async (submissionId) => {
+    const response = await api.delete(`/submissions/${submissionId}`);
+    return response.data;
+  },
+
+  // Approvals
+  approveSubmission: async (submissionId, adjustedFee = null) => {
+    const data = adjustedFee ? { adjusted_fee: adjustedFee } : {};
+    const response = await api.post(`/submissions/${submissionId}/approve`, data);
+    return response.data;
+  },
+  rejectSubmission: async (submissionId, reason, comments = '') => {
+    const response = await api.post(`/submissions/${submissionId}/reject`, {
+      rejection_reason: reason,
+      rejection_comments: comments
+    });
+    return response.data;
+  },
+  getErrandApprovals: async (errandId) => {
+    const response = await api.get(`/errands/${errandId}/approvals`);
+    return response.data;
+  },
+
+  // Rejected Errands
+  getMyRejectedErrands: async () => {
+    const response = await api.get('/errands/my-rejected');
+    return response.data;
+  },
+
+  // Notifications
+  getMyNotifications: async (params = {}) => {
+    const response = await api.get('/notifications', { params });
+    return response.data;
+  },
+
+  // Runner Stats
+  getRunnerStats: async () => {
+    const response = await api.get('/stats/runner');
+    return response.data;
+  },
+};
+
+// ========== INDIVIDUAL EXPORTS FOR ERRANDS ==========
+export const getDeliveryAgents = errandAPI.getDeliveryAgents;
+export const createDeliveryAgent = errandAPI.createDeliveryAgent;
+export const updateDeliveryAgent = errandAPI.updateDeliveryAgent;
+export const getAgentBranches = errandAPI.getAgentBranches;
+
+export const getErrands = errandAPI.getErrands;
+export const getMyErrands = errandAPI.getMyErrands;
+export const getPendingErrands = errandAPI.getPendingErrands;
+export const getErrand = errandAPI.getErrand;
+export const createErrand = errandAPI.createErrand;
+export const assignErrand = errandAPI.assignErrand;
+export const acceptErrand = errandAPI.acceptErrand;
+export const startErrand = errandAPI.startErrand;
+export const setErrandDeadline = errandAPI.setErrandDeadline;
+
+export const submitErrand = errandAPI.submitErrand;
+export const deleteSubmission = errandAPI.deleteSubmission;
+
+export const approveSubmission = errandAPI.approveSubmission;
+export const rejectSubmission = errandAPI.rejectSubmission;
+export const getErrandApprovals = errandAPI.getErrandApprovals;
+
+export const getMyRejectedErrands = errandAPI.getMyRejectedErrands;
+
+export const getMyNotifications = errandAPI.getMyNotifications;
+
+export const getRunnerStats = errandAPI.getRunnerStats;
+
 
 // Default export
 export default api;

@@ -1,12 +1,17 @@
-// src/website/pages/ProductDetailPage.jsx - FIXED with safe price handling
-import React, { useState, useEffect } from 'react';
+// src/website/pages/ProductDetailPage.jsx - WITH AUTOPLAY
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { 
   ArrowLeft, ShoppingCart, Heart, Share2, Truck, Shield, 
   CheckCircle, Clock, Package, Star, Users, Zap, Tag, 
-  Award, CreditCard, Smartphone, Store, Headphones 
+  Award, CreditCard, Smartphone, Store, Headphones, Video,
+  Play
 } from 'lucide-react';
+
+// Local placeholder data URIs (no external dependencies)
+const PLACEHOLDER_IMAGE = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'600\' height=\'600\' viewBox=\'0 0 600 600\'%3E%3Crect width=\'600\' height=\'600\' fill=\'%23f0f0f0\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' dominant-baseline=\'middle\' text-anchor=\'middle\' font-family=\'Arial\' font-size=\'24\' fill=\'%23999\'%3ENo Image%3C/text%3E%3C/svg%3E';
+const PLACEHOLDER_THUMB = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'80\' height=\'80\' viewBox=\'0 0 80 80\'%3E%3Crect width=\'80\' height=\'80\' fill=\'%23f0f0f0\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' dominant-baseline=\'middle\' text-anchor=\'middle\' font-family=\'Arial\' font-size=\'12\' fill=\'%23999\'%3EImg%3C/text%3E%3C/svg%3E';
 
 const ProductDetailPage = () => {
   const { id } = useParams();
@@ -15,26 +20,27 @@ const ProductDetailPage = () => {
   
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [selectedImage, setSelectedImage] = useState(0);
+  const [selectedMedia, setSelectedMedia] = useState(0);
+  const [mediaType, setMediaType] = useState('image');
   const [quantity, setQuantity] = useState(1);
   const [relatedProducts, setRelatedProducts] = useState([]);
   const [viewCount, setViewCount] = useState(Math.floor(Math.random() * 100) + 50);
   const [purchasedCount, setPurchasedCount] = useState(Math.floor(Math.random() * 500) + 100);
   const [activeTab, setActiveTab] = useState('description');
+  
+  // Refs for video elements
+  const videoRef = useRef(null);
 
   // ============ HELPER FUNCTIONS FOR SAFE PRICE HANDLING ============
   
   const getProductPrice = (product) => {
     if (!product) return 0;
-    // Check for offer price first
     if (product.is_on_offer && product.offer_price) {
       return parseFloat(product.offer_price) || 0;
     }
-    // Then check for selling_price (new field)
     if (product.selling_price) {
       return parseFloat(product.selling_price) || 0;
     }
-    // Then check for price (old field)
     if (product.price) {
       return parseFloat(product.price) || 0;
     }
@@ -43,7 +49,6 @@ const ProductDetailPage = () => {
 
   const getRegularPrice = (product) => {
     if (!product) return 0;
-    // Get the regular price (not offer price)
     if (product.selling_price) {
       return parseFloat(product.selling_price) || 0;
     }
@@ -71,6 +76,35 @@ const ProductDetailPage = () => {
     return Math.max(0, regular - current);
   };
 
+  // Combine images and videos into a single media array
+  const getMediaItems = () => {
+    const items = [];
+    
+    // Add images - FIXED: Use relative URLs
+    if (product?.image_urls && product.image_urls.length > 0) {
+      product.image_urls.forEach(url => {
+        items.push({
+          type: 'image',
+          url: url, // Already relative from the API
+          thumbnail: url
+        });
+      });
+    }
+    
+    // Add videos - FIXED: Use relative URLs
+    if (product?.video_urls && product.video_urls.length > 0) {
+      product.video_urls.forEach(url => {
+        items.push({
+          type: 'video',
+          url: url, // Already relative from the API
+          thumbnail: null
+        });
+      });
+    }
+    
+    return items;
+  };
+
   useEffect(() => {
     fetchProduct();
     fetchRelatedProducts();
@@ -80,10 +114,34 @@ const ProductDetailPage = () => {
     return () => clearTimeout(timer);
   }, [id]);
 
+  useEffect(() => {
+    // Reset selected media when product changes
+    if (product) {
+      setSelectedMedia(0);
+      const mediaItems = getMediaItems();
+      setMediaType(mediaItems[0]?.type || 'image');
+    }
+  }, [product]);
+
+  // Auto-play video when selected
+  useEffect(() => {
+    if (mediaType === 'video' && videoRef.current) {
+      // Small delay to ensure video is ready
+      setTimeout(() => {
+        videoRef.current.play().catch(e => {
+          console.log('Autoplay prevented:', e);
+          // User will need to click play - that's fine
+        });
+      }, 100);
+    }
+  }, [selectedMedia, mediaType]);
+
   const fetchProduct = async () => {
     try {
-      const response = await fetch(`http://localhost:5000/api/products/products/${id}`);
+      // FIXED: Using relative URL (already correct)
+      const response = await fetch(`/api/products/products/${id}`);
       const data = await response.json();
+      console.log('Product data:', data.product || data);
       setProduct(data.product || data);
     } catch (error) {
       console.error('Error fetching product:', error);
@@ -94,12 +152,19 @@ const ProductDetailPage = () => {
 
   const fetchRelatedProducts = async () => {
     try {
-      const response = await fetch(`http://localhost:5000/api/products/products?limit=6`);
+      // FIXED: Using relative URL (already correct)
+      const response = await fetch(`/api/products/products?limit=6`);
       const data = await response.json();
       setRelatedProducts(data.products || data);
     } catch (error) {
       console.error('Error fetching related products:', error);
     }
+  };
+
+  const handleMediaSelect = (index) => {
+    const mediaItems = getMediaItems();
+    setSelectedMedia(index);
+    setMediaType(mediaItems[index].type);
   };
 
   const handleAddToCart = () => {
@@ -199,16 +264,13 @@ const ProductDetailPage = () => {
     );
   }
 
-  // Calculate delivery date (2-4 days from now)
+  const mediaItems = getMediaItems();
+  const currentMedia = mediaItems[selectedMedia] || { type: 'image', url: PLACEHOLDER_IMAGE };
   const deliveryDate = new Date();
   deliveryDate.setDate(deliveryDate.getDate() + Math.floor(Math.random() * 3) + 2);
   const deliveryDateStr = deliveryDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
-
-  // Generate random rating
   const rating = (Math.random() * 0.5 + 4.5).toFixed(1);
   const reviewCount = Math.floor(Math.random() * 200) + 50;
-
-  // Get prices using safe helpers
   const currentPrice = getProductPrice(product);
   const regularPrice = getRegularPrice(product);
   const savings = calculateSavings(product);
@@ -240,25 +302,43 @@ const ProductDetailPage = () => {
         </button>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-          {/* Product Images */}
+          {/* Product Media (Images & Videos) - WITH AUTOPLAY */}
           <div>
-            <div className="bg-white rounded-xl shadow-lg overflow-hidden mb-4 relative group">
-              <img
-                src={
-                  product.image_urls && product.image_urls.length > selectedImage
-                    ? `http://localhost:5000${product.image_urls[selectedImage]}`
-                    : 'https://via.placeholder.com/600x600?text=No+Image'
-                }
-                alt={product.name}
-                className="w-full h-96 object-cover group-hover:scale-105 transition-transform duration-500"
-                onError={(e) => {
-                  e.target.onerror = null;
-                  e.target.src = 'https://via.placeholder.com/600x600?text=No+Image';
-                }}
-              />
+            <div className="bg-black/5 rounded-xl overflow-hidden mb-4 relative group">
+              {/* Main Media Display */}
+              {currentMedia.type === 'image' ? (
+                <img
+                  src={currentMedia.url}
+                  alt={product.name}
+                  className="w-full h-96 object-contain bg-white"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = PLACEHOLDER_IMAGE;
+                  }}
+                />
+              ) : (
+                <div className="w-full bg-black" style={{ height: '384px' }}>
+                  <video
+                    ref={videoRef}
+                    src={currentMedia.url}
+                    className="w-full h-full"
+                    controls
+                    playsInline
+                    preload="auto"
+                    style={{ objectFit: 'contain' }}
+                  >
+                    <source src={currentMedia.url} type="video/mp4" />
+                    Your browser does not support the video tag.
+                  </video>
+                  <div className="absolute top-4 left-4 bg-red-600 text-white px-3 py-1.5 rounded-lg text-sm font-bold shadow-lg flex items-center">
+                    <Video size={16} className="mr-1" />
+                    VIDEO
+                  </div>
+                </div>
+              )}
               
-              {/* Product Badges - FIXED with safe values */}
-              <div className="absolute top-4 left-4 flex flex-col gap-2">
+              {/* Product Badges */}
+              <div className="absolute top-4 right-4 flex flex-col gap-2">
                 {hasOffer && (
                   <div className="bg-gradient-to-r from-red-600 to-pink-600 text-white px-3 py-1.5 rounded-lg text-sm font-bold shadow-lg">
                     <div className="flex items-center">
@@ -278,35 +358,44 @@ const ProductDetailPage = () => {
               </div>
             </div>
 
-            {/* Thumbnail Images */}
-            {product.image_urls && product.image_urls.length > 1 && (
+            {/* Media Thumbnails (Images & Videos) */}
+            {mediaItems.length > 1 && (
               <div className="flex space-x-3 overflow-x-auto pb-2">
-                {product.image_urls.map((img, index) => (
+                {mediaItems.map((item, index) => (
                   <button
                     key={index}
-                    onClick={() => setSelectedImage(index)}
-                    className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${
-                      selectedImage === index 
+                    onClick={() => handleMediaSelect(index)}
+                    className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all relative ${
+                      selectedMedia === index 
                         ? 'border-red-600 ring-2 ring-red-200 scale-105' 
                         : 'border-gray-200 hover:border-red-400'
                     }`}
                   >
-                    <img
-                      src={`http://localhost:5000${img}`}
-                      alt={`${product.name} view ${index + 1}`}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.target.onerror = null;
-                        e.target.src = 'https://via.placeholder.com/80x80?text=Image';
-                      }}
-                    />
+                    {item.type === 'image' ? (
+                      <img
+                        src={item.thumbnail}
+                        alt={`${product.name} view ${index + 1}`}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = PLACEHOLDER_THUMB;
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gray-800 flex items-center justify-center">
+                        <Play size={20} className="text-white opacity-70" />
+                        <div className="absolute bottom-0 left-0 right-0 bg-red-600 text-white text-[8px] text-center py-0.5">
+                          VIDEO
+                        </div>
+                      </div>
+                    )}
                   </button>
                 ))}
               </div>
             )}
           </div>
 
-          {/* Product Info */}
+          {/* Product Info - Rest remains exactly the same */}
           <div className="space-y-6">
             {/* Product Header */}
             <div>
@@ -355,7 +444,7 @@ const ProductDetailPage = () => {
               </p>
             </div>
 
-            {/* Price Section - FIXED with safe helpers */}
+            {/* Price Section */}
             <div className="bg-gradient-to-r from-gray-50 to-white p-6 rounded-xl border">
               {hasOffer ? (
                 <div className="space-y-3">
@@ -388,7 +477,7 @@ const ProductDetailPage = () => {
               )}
             </div>
 
-            {/* Delivery Information - unchanged */}
+            {/* Delivery Information */}
             <div className="bg-white border rounded-xl p-5">
               <h3 className="font-bold text-lg mb-3 flex items-center text-gray-900">
                 <Truck className="text-red-600 mr-2" size={20} />
@@ -601,7 +690,7 @@ const ProductDetailPage = () => {
           </div>
         </div>
 
-        {/* Related Products - FIXED with safe price helpers */}
+        {/* Related Products */}
         {relatedProducts.length > 0 && (
           <div className="mb-12">
             <div className="flex justify-between items-center mb-6">
@@ -627,15 +716,28 @@ const ProductDetailPage = () => {
                       className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden group"
                     >
                       <div className="h-56 bg-gray-100 overflow-hidden relative">
-                        <img
-                          src={
-                            relatedProduct.image_urls && relatedProduct.image_urls.length > 0
-                              ? `http://localhost:5000${relatedProduct.image_urls[0]}`
-                              : 'https://via.placeholder.com/300x200?text=No+Image'
-                          }
-                          alt={relatedProduct.name}
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                        />
+                        {relatedProduct.image_urls && relatedProduct.image_urls.length > 0 ? (
+                          <img
+                            src={relatedProduct.image_urls[0]} // Already relative
+                            alt={relatedProduct.name}
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = PLACEHOLDER_IMAGE;
+                            }}
+                          />
+                        ) : relatedProduct.video_urls && relatedProduct.video_urls.length > 0 ? (
+                          <div className="w-full h-full bg-gray-800 flex items-center justify-center">
+                            <Video className="text-white mr-2" size={24} />
+                            <span className="text-white">Video</span>
+                          </div>
+                        ) : (
+                          <img
+                            src={PLACEHOLDER_IMAGE}
+                            alt="No image"
+                            className="w-full h-full object-cover"
+                          />
+                        )}
                         {relatedHasOffer && (
                           <div className="absolute top-2 left-2 bg-red-600 text-white px-2 py-1 rounded text-xs font-bold">
                             OFFER

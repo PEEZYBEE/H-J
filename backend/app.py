@@ -41,8 +41,15 @@ def create_app():
     # Bcrypt configuration
     app.config['BCRYPT_LOG_ROUNDS'] = int(os.getenv('BCRYPT_LOG_ROUNDS', 12))
     
-    # CORS configuration
-    CORS(app, supports_credentials=True, origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000", "http://127.0.0.1:3000"])
+    # CORS configuration - Allow ngrok domains
+    CORS(app, supports_credentials=True, origins=[
+    "http://localhost:5173", 
+    "http://127.0.0.1:5173", 
+    "http://localhost:3000", 
+    "http://127.0.0.1:3000",
+    "https://*.ngrok-free.dev",  # Allow all ngrok-free.dev subdomains
+    "https://supervital-unstoried-trace.ngrok-free.dev"  # Your specific ngrok URL
+])
 
     # Mail configuration
     app.config['MAIL_SERVER'] = 'smtp.gmail.com'
@@ -86,6 +93,7 @@ def create_app():
     from views.staff_routes import staff_bp
     from views.mpesa_routes import mpesa_bp
     from views.receiving_routes import receiving_bp
+    from views.errand_routes import errand_bp
     
     # Register blueprints with appropriate prefixes
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
@@ -97,6 +105,7 @@ def create_app():
     app.register_blueprint(staff_bp, url_prefix="/api/staff")
     app.register_blueprint(mpesa_bp, url_prefix="/api/mpesa")
     app.register_blueprint(receiving_bp, url_prefix="/api")
+    app.register_blueprint(errand_bp, url_prefix='/api')
     
     # Health check endpoint
     @app.route("/api/health")
@@ -162,8 +171,13 @@ def create_app():
     
     # ============ Initialize SocketIO AFTER these API routes ============
     socketio.init_app(app, 
-                      cors_allowed_origins=["http://localhost:5173", "http://127.0.0.1:5173"], 
-                      async_mode='eventlet')
+                  cors_allowed_origins=[
+                      "http://localhost:5173", 
+                      "http://127.0.0.1:5173",
+                      "https://*.ngrok-free.dev",
+                      "https://supervital-unstoried-trace.ngrok-free.dev"
+                  ], 
+                  async_mode='eventlet')
     
     # Create database tables on startup
     with app.app_context():

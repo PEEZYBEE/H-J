@@ -1,4 +1,4 @@
-// src/App.jsx - COMPLETE UPDATED VERSION WITH REJECTED BATCHES
+// src/App.jsx - COMPLETE UPDATED VERSION WITH REJECTED BATCHES AND ERRAND SYSTEM
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
@@ -24,7 +24,18 @@ import BatchReceiving from './pages/inventory/BatchReceiving';
 import BatchApproval from './pages/inventory/BatchApproval';
 import InventoryDashboard from './pages/inventory/InventoryDashboard';
 import InventoryTransactions from './pages/inventory/InventoryTransactions';
-import RejectedBatches from './pages/inventory/RejectedBatches'; // NEW IMPORT
+import RejectedBatches from './pages/inventory/RejectedBatches';
+
+// ===== ERRAND SYSTEM IMPORTS =====
+import ErrandDashboard from './pages/errand/ErrandDashboard';
+import CreateErrand from './pages/errand/CreateErrand';
+import CreateRunnerErrand from './pages/errand/CreateRunnerErrand';
+import ErrandSubmit from './pages/errand/ErrandSubmit';
+import ErrandApproval from './pages/errand/ErrandApproval';
+import MyErrands from './pages/errand/MyErrands';
+import RunnerPerformance from './pages/errand/RunnerPerformance';  
+import ErrandDetails from './pages/errand/ErrandDetails';
+// =================================
 
 // Website System
 import { CartProvider } from './website/context/CartContext';
@@ -42,6 +53,19 @@ import PaymentPendingPage from './website/pages/PaymentPendingPage';
 
 // CSS imports for Vite
 import './index.css';
+
+// Helper component to check user role and redirect
+const DashboardOrRedirect = () => {
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  
+  // If user is errand runner, redirect to errands page
+  if (user.role === 'errand') {
+    return <Navigate to="/errands" replace />;
+  }
+  
+  // Otherwise show the regular dashboard
+  return <Dashboard />;
+};
 
 function App() {
   return (
@@ -74,7 +98,7 @@ function App() {
               <AppLayout />
             </ProtectedRoute>
           }>
-            <Route index element={<Dashboard />} />
+            <Route index element={<DashboardOrRedirect />} />
             <Route path="products" element={<Products />} />
             <Route path="products/new" element={<AddProduct />} />
             <Route path="orders" element={<Orders />} />
@@ -112,10 +136,65 @@ function App() {
                 <InventoryTransactions />
               </ProtectedRoute>
             } />
-            {/* NEW: Rejected Batches Route */}
             <Route path="rejected-batches" element={
               <ProtectedRoute allowedRoles={['admin', 'manager', 'receiver']}>
                 <RejectedBatches />
+              </ProtectedRoute>
+            } />
+          </Route>
+
+          {/* === ERRAND SYSTEM === */}
+          <Route path="/errands" element={
+            <ProtectedRoute allowedRoles={['admin', 'manager', 'senior', 'errand']}>
+              <AppLayout />
+            </ProtectedRoute>
+          }>
+            <Route index element={<ErrandDashboard />} />
+            
+            {/* My Errands page for runners */}
+            <Route path="my" element={
+              <ProtectedRoute allowedRoles={['errand']}>
+                <MyErrands />
+              </ProtectedRoute>
+            } />
+            
+            {/* RUNNER PERFORMANCE - FOR ADMINS */}
+            <Route path="runner-performance" element={
+              <ProtectedRoute allowedRoles={['admin', 'manager', 'senior']}>
+                <RunnerPerformance />
+              </ProtectedRoute>
+            } />
+            
+            {/*  ERRAND DETAILS */}
+            <Route path="details/:errandId" element={
+              <ProtectedRoute allowedRoles={['admin', 'manager', 'senior', 'errand']}>
+                <ErrandDetails />
+              </ProtectedRoute>
+             } />
+
+            {/* Admin/Senior create errand */}
+            <Route path="create" element={
+              <ProtectedRoute allowedRoles={['admin', 'manager', 'senior']}>
+                <CreateErrand />
+              </ProtectedRoute>
+            } />
+            
+            {/* Runner create their own errand */}
+            <Route path="create-runner" element={
+              <ProtectedRoute allowedRoles={['errand']}>
+                <CreateRunnerErrand />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="submit/:errandId" element={
+              <ProtectedRoute allowedRoles={['errand', 'admin', 'manager', 'senior']}>
+                <ErrandSubmit />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="approval/:errandId" element={
+              <ProtectedRoute allowedRoles={['admin', 'senior', 'manager']}>
+                <ErrandApproval />
               </ProtectedRoute>
             } />
           </Route>

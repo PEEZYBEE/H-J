@@ -73,7 +73,7 @@ const Navbar = () => {
                   <button
                     onClick={() => {
                       localStorage.clear();
-                      window.location.href = '/'; // CHANGED: Redirect to website home page
+                      window.location.href = '/';
                     }}
                     className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
                   >

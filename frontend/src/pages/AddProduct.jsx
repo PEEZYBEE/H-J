@@ -1,28 +1,42 @@
-// ~/hnj/frontend/src/components/products/AddProduct.jsx - COMPLETE FIXED VERSION
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaSave, FaTimes, FaPlus, FaMinus, FaUpload, FaTrash } from 'react-icons/fa';
+import { 
+  FaSave, 
+  FaTimes, 
+  FaPlus, 
+  FaMinus, 
+  FaUpload, 
+  FaTrash,
+  FaVideo,
+  FaImage,
+  FaPlay,
+  FaFileVideo
+} from 'react-icons/fa';
+import { categoriesAPI, productsAPI, uploadVideos, uploadVideo } from '../services/api';
 
 const AddProduct = () => {
   const navigate = useNavigate();
-  const fileInputRef = useRef(null);
+  const imageInputRef = useRef(null);
+  const videoInputRef = useRef(null);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
   const [categories, setCategories] = useState([]);
-  const [subcategories, setSubcategories] = useState([]);
   const [specFields, setSpecFields] = useState([{ key: '', value: '' }]);
 
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     category_id: '',
-    subcategory_id: '',
     selling_price: '',
     cost_price: '',
     stock_quantity: '0',
     min_stock_level: '5',
     image_urls: [],
     uploaded_images: [],
+    video_urls: [],
+    uploaded_videos: [],
     specifications: {},
     is_on_offer: false,
     offer_price: '',
@@ -36,43 +50,25 @@ const AddProduct = () => {
   });
 
   const [localImages, setLocalImages] = useState([]);
+  const [localVideos, setLocalVideos] = useState([]);
 
   useEffect(() => {
     fetchCategories();
   }, []);
 
-  useEffect(() => {
-    if (formData.category_id) {
-      fetchSubcategories(formData.category_id);
-    } else {
-      setSubcategories([]);
-    }
-  }, [formData.category_id]);
-
   const fetchCategories = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/products/categories', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await response.json();
-      setCategories(data.categories || data);
+      const response = await categoriesAPI.getAllCategories();
+      console.log('Categories API response:', response);
+      
+      const categoriesList = response.categories || response || [];
+      setCategories(categoriesList);
+      
+      if (categoriesList.length === 0) {
+        console.warn('No categories found in response');
+      }
     } catch (error) {
       console.error('Error fetching categories:', error);
-    }
-  };
-
-  const fetchSubcategories = async (categoryId) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/products/categories/${categoryId}/subcategories`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await response.json();
-      setSubcategories(data.subcategories || []);
-    } catch (error) {
-      console.error('Error fetching subcategories:', error);
-      setSubcategories([]);
     }
   };
 
@@ -84,12 +80,13 @@ const AddProduct = () => {
     }));
   };
 
-  const handleFileSelect = async (e) => {
+  // ============ IMAGE HANDLING ============
+  const handleImageSelect = async (e) => {
     const files = Array.from(e.target.files);
     
     const validFiles = files.filter(file => {
       const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
-      const maxSize = 5 * 1024 * 1024;
+      const maxSize = 5 * 1024 * 1024; // 5MB
       
       if (!validTypes.includes(file.type)) {
         alert(`${file.name} is not a valid image type (JPEG, PNG, WEBP, GIF only)`);
@@ -129,7 +126,7 @@ const AddProduct = () => {
       });
       formData.append('folder', 'products');
 
-      const response = await fetch('http://localhost:5000/api/products/upload/multiple', {
+      const response = await fetch('/api/products/upload/multiple', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -161,7 +158,7 @@ const AddProduct = () => {
       formData.append('image', file);
       formData.append('folder', 'products');
 
-      const response = await fetch('http://localhost:5000/api/products/upload', {
+      const response = await fetch('/api/products/upload', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -200,6 +197,104 @@ const AddProduct = () => {
     }
   };
 
+  // ============ VIDEO HANDLING - UPDATED TO USE API ============
+  const handleVideoSelect = async (e) => {
+    const files = Array.from(e.target.files);
+    
+    const validFiles = files.filter(file => {
+      const validTypes = ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime'];
+      const maxSize = 50 * 1024 * 1024; // 50MB for videos
+      
+      if (!validTypes.includes(file.type)) {
+        alert(`${file.name} is not a valid video type (MP4, WEBM, OGG, MOV only)`);
+        return false;
+      }
+      
+      if (file.size > maxSize) {
+        alert(`${file.name} is too large (max 50MB)`);
+        return false;
+      }
+      
+      return true;
+    });
+
+    if (validFiles.length === 0) return;
+
+    const newLocalVideos = validFiles.map(file => ({
+      file,
+      preview: URL.createObjectURL(file),
+      name: file.name,
+      size: (file.size / 1024 / 1024).toFixed(2) + 'MB',
+      type: file.type
+    }));
+
+    setLocalVideos(prev => [...prev, ...newLocalVideos]);
+    await uploadVideosUsingAPI(validFiles);
+    e.target.value = '';
+  };
+
+  const uploadVideosUsingAPI = async (files) => {
+    try {
+      setUploadingVideo(true);
+      
+      // Using the API function from api.js
+      const response = await uploadVideos(files, 'product_videos');
+      
+      if (response.success) {
+        setFormData(prev => ({
+          ...prev,
+          uploaded_videos: [...prev.uploaded_videos, ...response.videoUrls]
+        }));
+      } else {
+        // Fallback to single uploads
+        await uploadSingleVideosUsingAPI(files);
+      }
+    } catch (error) {
+      console.error('Error uploading videos:', error);
+      alert('Error uploading videos: ' + error.message);
+    } finally {
+      setUploadingVideo(false);
+    }
+  };
+
+  const uploadSingleVideosUsingAPI = async (files) => {
+    try {
+      const uploadPromises = files.map(async (file) => {
+        const response = await uploadVideo(file, 'product_videos');
+        if (!response.success) {
+          throw new Error(`Failed to upload ${file.name}`);
+        }
+        return response.videoUrl;
+      });
+
+      const uploadedUrls = await Promise.all(uploadPromises);
+      
+      setFormData(prev => ({
+        ...prev,
+        uploaded_videos: [...prev.uploaded_videos, ...uploadedUrls]
+      }));
+
+      alert(`Successfully uploaded ${uploadedUrls.length} video(s)`);
+    } catch (error) {
+      console.error('Error uploading videos:', error);
+      alert('Error uploading videos: ' + error.message);
+    }
+  };
+
+  const removeVideo = (index, isLocal = true) => {
+    if (isLocal) {
+      const updatedVideos = [...localVideos];
+      URL.revokeObjectURL(updatedVideos[index].preview);
+      updatedVideos.splice(index, 1);
+      setLocalVideos(updatedVideos);
+    } else {
+      const updatedUrls = [...formData.uploaded_videos];
+      updatedUrls.splice(index, 1);
+      setFormData(prev => ({ ...prev, uploaded_videos: updatedUrls }));
+    }
+  };
+
+  // ============ SPECIFICATIONS HANDLING ============
   const handleSpecChange = (index, field, value) => {
     const updatedSpecs = [...specFields];
     updatedSpecs[index][field] = value;
@@ -233,18 +328,12 @@ const AddProduct = () => {
     });
 
     const allImageUrls = [...formData.uploaded_images, ...formData.image_urls.filter(url => url.trim())];
-
-    // FIX: Convert empty subcategory_id to null, and ensure it's an integer if provided
-    let subcategoryId = null;
-    if (formData.subcategory_id && formData.subcategory_id !== '') {
-      subcategoryId = parseInt(formData.subcategory_id);
-    }
+    const allVideoUrls = [...formData.uploaded_videos, ...formData.video_urls.filter(url => url.trim())];
 
     const dataToSend = {
       name: formData.name,
       description: formData.description,
       category_id: parseInt(formData.category_id),
-      subcategory_id: subcategoryId,  // FIXED: Will be null if empty, integer if selected
       selling_price: parseFloat(formData.selling_price) || 0,
       cost_price: formData.cost_price ? parseFloat(formData.cost_price) : null,
       stock_quantity: parseInt(formData.stock_quantity) || 0,
@@ -259,30 +348,23 @@ const AddProduct = () => {
       offer_price: formData.is_on_offer && formData.offer_price ? parseFloat(formData.offer_price) : null,
       discount_percentage: formData.is_on_offer && formData.discount_percentage ? parseInt(formData.discount_percentage) : null,
       image_urls: allImageUrls,
+      video_urls: allVideoUrls,
       specifications: Object.keys(specifications).length > 0 ? specifications : {}
     };
 
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/products/staff/products', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(dataToSend)
-      });
+      const response = await productsAPI.createProduct(dataToSend);
 
-      if (response.ok) {
-        const result = await response.json();
+      if (response.success) {
         alert('Product added successfully!');
         
+        // Clean up object URLs
         localImages.forEach(img => URL.revokeObjectURL(img.preview));
+        localVideos.forEach(vid => URL.revokeObjectURL(vid.preview));
         navigate('/products');
       } else {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to add product');
+        throw new Error(response.message || 'Failed to add product');
       }
     } catch (error) {
       alert('Error: ' + error.message);
@@ -354,32 +436,19 @@ const AddProduct = () => {
               required
             >
               <option value="">Select Category</option>
-              {categories.map(category => (
-                <option key={category.id} value={category.id}>
-                  {category.code} - {category.name}
-                </option>
-              ))}
+              {categories.length > 0 ? (
+                categories.map(category => (
+                  <option key={category.id} value={category.id}>
+                    {category.code} - {category.name}
+                  </option>
+                ))
+              ) : (
+                <option value="" disabled>Loading categories...</option>
+              )}
             </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Subcategory
-            </label>
-            <select
-              name="subcategory_id"
-              value={formData.subcategory_id}
-              onChange={handleChange}
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-red-500 focus:border-transparent"
-              disabled={!formData.category_id}
-            >
-              <option value="">Select Subcategory (Optional)</option>
-              {subcategories.map(sub => (
-                <option key={sub.id} value={sub.id}>
-                  {sub.code} - {sub.name}
-                </option>
-              ))}
-            </select>
+            {categories.length === 0 && (
+              <p className="text-sm text-yellow-600 mt-1">No categories found. Please create categories first.</p>
+            )}
           </div>
 
           {/* Pricing & Stock */}
@@ -450,7 +519,7 @@ const AddProduct = () => {
             />
           </div>
 
-          {/* Brand/Model/Color/Size Section */}
+          {/* Product Attributes */}
           <div className="md:col-span-2 mt-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4 pb-2 border-b">Product Attributes</h2>
           </div>
@@ -579,139 +648,294 @@ const AddProduct = () => {
             )}
           </div>
 
-          {/* Image Upload Section */}
+          {/* ===== MEDIA UPLOAD SECTION ===== */}
           <div className="md:col-span-2 mt-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 pb-2 border-b">Product Images</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4 pb-2 border-b">Product Media</h2>
             
-            <div className="mb-6">
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileSelect}
-                accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
-                multiple
-                className="hidden"
-              />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current.click()}
-                disabled={uploading}
-                className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-3 rounded-lg hover:from-blue-600 hover:to-blue-700 disabled:opacity-50"
-              >
-                <FaUpload />
-                {uploading ? 'Uploading...' : 'Upload Images from Device'}
-              </button>
-              <p className="text-sm text-gray-500 mt-2">
-                Supports JPEG, PNG, WEBP, GIF (max 5MB each)
-              </p>
-            </div>
-
-            {/* Image Previews */}
-            {(localImages.length > 0 || formData.uploaded_images.length > 0) && (
-              <div className="mb-6">
-                <h3 className="text-md font-medium text-gray-700 mb-3">Uploaded Images:</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                  {localImages.map((image, index) => (
-                    <div key={`local-${index}`} className="relative group">
-                      <img
-                        src={image.preview}
-                        alt={`Preview ${index + 1}`}
-                        className="w-full h-32 object-cover rounded-lg border border-gray-200"
-                      />
-                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
-                        <button
-                          type="button"
-                          onClick={() => removeImage(index, true)}
-                          className="p-2 bg-red-600 text-white rounded-full hover:bg-red-700"
-                        >
-                          <FaTrash />
-                        </button>
-                      </div>
-                      <div className="text-xs text-gray-500 mt-1 truncate">
-                        {image.name}
-                      </div>
-                    </div>
-                  ))}
-
-                  {formData.uploaded_images.map((url, index) => (
-                    <div key={`uploaded-${index}`} className="relative group">
-                      <img
-                        src={`http://localhost:5000/api/uploads/products/${url.split('/').pop()}`}
-                        alt={`Uploaded ${index + 1}`}
-                        className="w-full h-32 object-cover rounded-lg border border-gray-200"
-                        onError={(e) => {
-                          e.target.onerror = null;
-                          e.target.src = 'https://via.placeholder.com/150?text=Image+Error';
-                        }}
-                      />
-                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
-                        <button
-                          type="button"
-                          onClick={() => removeImage(index, false)}
-                          className="p-2 bg-red-600 text-white rounded-full hover:bg-red-700"
-                        >
-                          <FaTrash />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Manual URL Input */}
-            <div className="mb-4">
-              <h3 className="text-md font-medium text-gray-700 mb-3">Or Add Image URLs:</h3>
-              {formData.image_urls.map((url, index) => (
-                <div key={index} className="flex gap-2 mb-3">
-                  <input
-                    type="text"
-                    placeholder="/static/uploads/products/filename.jpg"
-                    value={url}
-                    onChange={(e) => {
-                      const updatedUrls = [...formData.image_urls];
-                      updatedUrls[index] = e.target.value;
-                      setFormData(prev => ({ ...prev, image_urls: updatedUrls }));
-                    }}
-                    className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                  />
-                  {index === 0 ? (
-                    <button
-                      type="button"
-                      onClick={() => setFormData(prev => ({ 
-                        ...prev, 
-                        image_urls: [...prev.image_urls, ''] 
-                      }))}
-                      className="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 flex items-center gap-2"
-                    >
-                      <FaPlus /> Add URL
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const updatedUrls = formData.image_urls.filter((_, i) => i !== index);
-                        setFormData(prev => ({ ...prev, image_urls: updatedUrls }));
-                      }}
-                      className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200"
-                    >
-                      <FaMinus />
-                    </button>
-                  )}
-                </div>
-              ))}
-              {formData.image_urls.length === 0 && (
+            {/* Images Section */}
+            <div className="mb-8">
+              <h3 className="text-md font-medium text-gray-800 mb-3 flex items-center gap-2">
+                <FaImage className="text-blue-600" /> Product Images
+              </h3>
+              <div className="mb-4">
+                <input
+                  type="file"
+                  ref={imageInputRef}
+                  onChange={handleImageSelect}
+                  accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+                  multiple
+                  className="hidden"
+                />
                 <button
                   type="button"
-                  onClick={() => setFormData(prev => ({ 
-                    ...prev, 
-                    image_urls: [''] 
-                  }))}
-                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-2"
+                  onClick={() => imageInputRef.current.click()}
+                  disabled={uploading}
+                  className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-3 rounded-lg hover:from-blue-600 hover:to-blue-700 disabled:opacity-50"
                 >
-                  <FaPlus /> Add Image URL
+                  <FaUpload />
+                  {uploading ? 'Uploading...' : 'Upload Images'}
                 </button>
+                <p className="text-sm text-gray-500 mt-2">
+                  Supports JPEG, PNG, WEBP, GIF (max 5MB each). You can select multiple images.
+                </p>
+              </div>
+
+              {/* Image Previews */}
+              {(localImages.length > 0 || formData.uploaded_images.length > 0) && (
+                <div className="mb-6">
+                  <h4 className="text-sm font-medium text-gray-700 mb-3">Uploaded Images:</h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                    {localImages.map((image, index) => (
+                      <div key={`local-${index}`} className="relative group">
+                        <img
+                          src={image.preview}
+                          alt={`Preview ${index + 1}`}
+                          className="w-full h-32 object-cover rounded-lg border border-gray-200"
+                        />
+                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
+                          <button
+                            type="button"
+                            onClick={() => removeImage(index, true)}
+                            className="p-2 bg-red-600 text-white rounded-full hover:bg-red-700"
+                          >
+                            <FaTrash />
+                          </button>
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1 truncate">
+                          {image.name}
+                        </div>
+                      </div>
+                    ))}
+
+                    {formData.uploaded_images.map((url, index) => (
+                      <div key={`uploaded-${index}`} className="relative group">
+                        <img
+                          src={`/api/uploads/products/${url.split('/').pop()}`}
+                          alt={`Uploaded ${index + 1}`}
+                          className="w-full h-32 object-cover rounded-lg border border-gray-200"
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = 'https://via.placeholder.com/150?text=Image+Error';
+                          }}
+                        />
+                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
+                          <button
+                            type="button"
+                            onClick={() => removeImage(index, false)}
+                            className="p-2 bg-red-600 text-white rounded-full hover:bg-red-700"
+                          >
+                            <FaTrash />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
+
+              {/* Manual Image URL Input */}
+              <div className="mb-4">
+                <h4 className="text-sm font-medium text-gray-700 mb-3">Or Add Image URLs:</h4>
+                {formData.image_urls.map((url, index) => (
+                  <div key={index} className="flex gap-2 mb-3">
+                    <input
+                      type="text"
+                      placeholder="/static/uploads/products/filename.jpg"
+                      value={url}
+                      onChange={(e) => {
+                        const updatedUrls = [...formData.image_urls];
+                        updatedUrls[index] = e.target.value;
+                        setFormData(prev => ({ ...prev, image_urls: updatedUrls }));
+                      }}
+                      className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    />
+                    {index === 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ 
+                          ...prev, 
+                          image_urls: [...prev.image_urls, ''] 
+                        }))}
+                        className="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 flex items-center gap-2"
+                      >
+                        <FaPlus /> Add URL
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updatedUrls = formData.image_urls.filter((_, i) => i !== index);
+                          setFormData(prev => ({ ...prev, image_urls: updatedUrls }));
+                        }}
+                        className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200"
+                      >
+                        <FaMinus />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {formData.image_urls.length === 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ 
+                      ...prev, 
+                      image_urls: [''] 
+                    }))}
+                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-2"
+                  >
+                    <FaPlus /> Add Image URL
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Videos Section - UPDATED TO USE API */}
+            <div className="mt-8 pt-6 border-t border-gray-200">
+              <h3 className="text-md font-medium text-gray-800 mb-3 flex items-center gap-2">
+                <FaVideo className="text-red-600" /> Product Videos
+              </h3>
+              <div className="mb-4">
+                <input
+                  type="file"
+                  ref={videoInputRef}
+                  onChange={handleVideoSelect}
+                  accept="video/mp4,video/webm,video/ogg,video/quicktime"
+                  multiple
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => videoInputRef.current.click()}
+                  disabled={uploadingVideo}
+                  className="flex items-center gap-2 bg-gradient-to-r from-red-500 to-red-600 text-white px-6 py-3 rounded-lg hover:from-red-600 hover:to-red-700 disabled:opacity-50"
+                >
+                  <FaVideo />
+                  {uploadingVideo ? 'Uploading...' : 'Upload Videos'}
+                </button>
+                <p className="text-sm text-gray-500 mt-2">
+                  Supports MP4, WEBM, OGG, MOV (max 50MB each). You can select multiple videos.
+                </p>
+              </div>
+
+              {/* Video Previews */}
+              {(localVideos.length > 0 || formData.uploaded_videos.length > 0) && (
+                <div className="mb-6">
+                  <h4 className="text-sm font-medium text-gray-700 mb-3">Uploaded Videos:</h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                    {localVideos.map((video, index) => (
+                      <div key={`local-video-${index}`} className="relative group">
+                        <div className="w-full h-32 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center relative">
+                          <video 
+                            src={video.preview} 
+                            className="w-full h-full object-cover rounded-lg"
+                            controls={false}
+                          />
+                          <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center">
+                            <FaPlay className="text-white text-2xl opacity-70" />
+                          </div>
+                          <div className="absolute top-1 left-1 bg-red-600 text-white text-xs px-1 py-0.5 rounded">
+                            {video.type.includes('mp4') ? 'MP4' : 'VIDEO'}
+                          </div>
+                        </div>
+                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
+                          <button
+                            type="button"
+                            onClick={() => removeVideo(index, true)}
+                            className="p-2 bg-red-600 text-white rounded-full hover:bg-red-700"
+                          >
+                            <FaTrash />
+                          </button>
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1 truncate">
+                          {video.name}
+                        </div>
+                      </div>
+                    ))}
+
+                    {formData.uploaded_videos.map((url, index) => (
+                      <div key={`uploaded-video-${index}`} className="relative group">
+                        <div className="w-full h-32 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center relative">
+                          <video 
+                            src={`/api/uploads/product_videos/${url.split('/').pop()}`}
+                            className="w-full h-full object-cover rounded-lg"
+                            controls={false}
+                          />
+                          <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center">
+                            <FaPlay className="text-white text-2xl opacity-70" />
+                          </div>
+                          <div className="absolute top-1 left-1 bg-red-600 text-white text-xs px-1 py-0.5 rounded">
+                            VIDEO
+                          </div>
+                        </div>
+                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
+                          <button
+                            type="button"
+                            onClick={() => removeVideo(index, false)}
+                            className="p-2 bg-red-600 text-white rounded-full hover:bg-red-700"
+                          >
+                            <FaTrash />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Manual Video URL Input */}
+              <div className="mb-4">
+                <h4 className="text-sm font-medium text-gray-700 mb-3">Or Add Video URLs:</h4>
+                {formData.video_urls.map((url, index) => (
+                  <div key={index} className="flex gap-2 mb-3">
+                    <input
+                      type="text"
+                      placeholder="https://www.youtube.com/watch?v=... or /static/uploads/videos/filename.mp4"
+                      value={url}
+                      onChange={(e) => {
+                        const updatedUrls = [...formData.video_urls];
+                        updatedUrls[index] = e.target.value;
+                        setFormData(prev => ({ ...prev, video_urls: updatedUrls }));
+                      }}
+                      className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    />
+                    {index === 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ 
+                          ...prev, 
+                          video_urls: [...prev.video_urls, ''] 
+                        }))}
+                        className="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 flex items-center gap-2"
+                      >
+                        <FaPlus /> Add URL
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updatedUrls = formData.video_urls.filter((_, i) => i !== index);
+                          setFormData(prev => ({ ...prev, video_urls: updatedUrls }));
+                        }}
+                        className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200"
+                      >
+                        <FaMinus />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {formData.video_urls.length === 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ 
+                      ...prev, 
+                      video_urls: [''] 
+                    }))}
+                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-2"
+                  >
+                    <FaPlus /> Add Video URL
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
@@ -770,7 +994,7 @@ const AddProduct = () => {
           </button>
           <button
             type="submit"
-            disabled={loading || uploading}
+            disabled={loading || uploading || uploadingVideo}
             className="flex items-center gap-2 bg-red-600 text-white px-8 py-3 rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (

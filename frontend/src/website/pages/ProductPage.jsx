@@ -1,12 +1,17 @@
-// src/website/pages/ProductPage.jsx
-import React, { useState, useEffect } from 'react';
+// src/website/pages/ProductPage.jsx - SIMPLIFIED WITH WORKING VIDEO AND AUTOPLAY
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
-  FaShoppingCart, FaStar, FaStarHalfAlt, FaTruck, 
+  FaShoppingCart, FaStar, FaTruck, 
   FaShieldAlt, FaArrowLeft, FaShareAlt, FaHeart,
-  FaCheck, FaTimes, FaPlus, FaMinus
+  FaCheck, FaTimes, FaPlus, FaMinus, FaPlay,
+  FaVideo
 } from 'react-icons/fa';
 import { useCart } from '../context/CartContext';
+
+// Local placeholder data URIs (no external dependencies)
+const PLACEHOLDER_IMAGE = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'600\' height=\'600\' viewBox=\'0 0 600 600\'%3E%3Crect width=\'600\' height=\'600\' fill=\'%23f0f0f0\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' dominant-baseline=\'middle\' text-anchor=\'middle\' font-family=\'Arial\' font-size=\'24\' fill=\'%23999\'%3ENo Image%3C/text%3E%3C/svg%3E';
+const PLACEHOLDER_THUMB = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'80\' height=\'80\' viewBox=\'0 0 80 80\'%3E%3Crect width=\'80\' height=\'80\' fill=\'%23f0f0f0\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' dominant-baseline=\'middle\' text-anchor=\'middle\' font-family=\'Arial\' font-size=\'12\' fill=\'%23999\'%3EImg%3C/text%3E%3C/svg%3E';
 
 const ProductPage = () => {
   const { id } = useParams();
@@ -17,26 +22,51 @@ const ProductPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [quantity, setQuantity] = useState(1);
-  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
+  const [mediaType, setMediaType] = useState('image');
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [relatedProducts, setRelatedProducts] = useState([]);
+  
+  // Video ref for autoplay
+  const videoRef = useRef(null);
 
   useEffect(() => {
     fetchProduct();
     fetchRelatedProducts();
   }, [id]);
 
+  useEffect(() => {
+    // Reset media selection when product changes
+    if (product) {
+      setSelectedMediaIndex(0);
+      const mediaItems = getMediaItems();
+      setMediaType(mediaItems[0]?.type || 'image');
+    }
+  }, [product]);
+
+  // Auto-play video when selected
+  useEffect(() => {
+    if (mediaType === 'video' && videoRef.current) {
+      setTimeout(() => {
+        videoRef.current.play().catch(e => {
+          console.log('Autoplay prevented:', e);
+        });
+      }, 100);
+    }
+  }, [selectedMediaIndex, mediaType]);
+
   const fetchProduct = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:5000/api/products/${id}`);
+      // FIXED: Using relative URL
+      const response = await fetch(`/api/products/products/${id}`);
       
       if (!response.ok) {
         throw new Error('Product not found');
       }
       
       const data = await response.json();
-      setProduct(data);
+      setProduct(data.product || data);
       setError(null);
     } catch (err) {
       setError(err.message);
@@ -48,7 +78,8 @@ const ProductPage = () => {
 
   const fetchRelatedProducts = async () => {
     try {
-      const response = await fetch(`http://localhost:5000/api/products/related/${id}?limit=4`);
+      // FIXED: Using relative URL
+      const response = await fetch(`/api/products/products?limit=4`);
       if (response.ok) {
         const data = await response.json();
         setRelatedProducts(data.products || data);
@@ -58,16 +89,65 @@ const ProductPage = () => {
     }
   };
 
+  // Combine images and videos into a single media array
+  const getMediaItems = () => {
+    if (!product) return [];
+    
+    const items = [];
+    
+    // Add images - FIXED: Use relative URLs
+    if (product.image_urls && product.image_urls.length > 0) {
+      product.image_urls.forEach(url => {
+        items.push({
+          type: 'image',
+          url: url, // Already relative from the API
+          thumbnail: url
+        });
+      });
+    }
+    
+    // Add videos - FIXED: Use relative URLs
+    if (product.video_urls && product.video_urls.length > 0) {
+      product.video_urls.forEach(url => {
+        items.push({
+          type: 'video',
+          url: url, // Already relative from the API
+          thumbnail: null
+        });
+      });
+    }
+    
+    // If no media at all, add a placeholder
+    if (items.length === 0) {
+      items.push({
+        type: 'image',
+        url: PLACEHOLDER_IMAGE,
+        thumbnail: PLACEHOLDER_THUMB
+      });
+    }
+    
+    return items;
+  };
+
+  const handleMediaSelect = (index) => {
+    const mediaItems = getMediaItems();
+    setSelectedMediaIndex(index);
+    setMediaType(mediaItems[index].type);
+  };
+
   const handleAddToCart = () => {
     if (!product || product.stock_quantity === 0) return;
     
     setIsAddingToCart(true);
-    addToCart(product, quantity);
+    
+    // Add the product with quantity
+    for (let i = 0; i < quantity; i++) {
+      addToCart(product);
+    }
     
     // Show success animation
     setTimeout(() => {
       setIsAddingToCart(false);
-      // Show notification or redirect to cart
       alert(`${quantity} ${product.name}(s) added to cart!`);
     }, 500);
   };
@@ -83,7 +163,9 @@ const ProductPage = () => {
     if (!product || product.stock_quantity === 0) return;
     
     // Add to cart and redirect to checkout
-    addToCart(product, quantity);
+    for (let i = 0; i < quantity; i++) {
+      addToCart(product);
+    }
     navigate('/checkout');
   };
 
@@ -145,9 +227,11 @@ const ProductPage = () => {
     );
   }
 
-  const price = product.is_on_offer && product.offer_price ? product.offer_price : product.price;
-  const discount = product.is_on_offer && product.price ? Math.round(((product.price - price) / product.price) * 100) : 0;
-  const images = product.image_urls || [];
+  const mediaItems = getMediaItems();
+  const currentMedia = mediaItems[selectedMediaIndex];
+  const price = product.is_on_offer && product.offer_price ? product.offer_price : (product.selling_price || product.price || 0);
+  const originalPrice = product.price || 0;
+  const discount = product.is_on_offer && originalPrice > price ? Math.round(((originalPrice - price) / originalPrice) * 100) : 0;
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -190,63 +274,75 @@ const ProductPage = () => {
         </div>
 
         <div className="flex flex-col lg:flex-row gap-8">
-          {/* Left Column - Images */}
+          {/* Left Column - Media (Images & Videos) */}
           <div className="lg:w-1/2">
-            {/* Main Image */}
+            {/* Main Media Display */}
             <div className="bg-white rounded-lg shadow-md p-4 mb-4">
-              <div className="h-96 flex items-center justify-center bg-gray-100 rounded-lg overflow-hidden">
-                {images.length > 0 ? (
+              <div className="h-96 flex items-center justify-center bg-gray-100 rounded-lg overflow-hidden relative">
+                {currentMedia.type === 'image' ? (
                   <img
-                    src={`http://localhost:5000/api/uploads/products/${images[selectedImageIndex]?.split('/').pop()}`}
-                    alt={`${product.name} - Image ${selectedImageIndex + 1}`}
+                    src={currentMedia.url}
+                    alt={`${product.name} - Media ${selectedMediaIndex + 1}`}
                     className="max-h-full max-w-full object-contain"
                     onError={(e) => {
                       e.target.onerror = null;
-                      e.target.src = '';
-                      e.target.style.display = 'none';
-                      const fallback = e.target.parentNode.querySelector('.image-fallback') || 
-                        document.createElement('div');
-                      fallback.className = 'image-fallback text-gray-400 text-center';
-                      fallback.innerHTML = '<div class="text-4xl mb-2">📷</div><p>Image not available</p>';
-                      if (!e.target.parentNode.querySelector('.image-fallback')) {
-                        e.target.parentNode.appendChild(fallback);
-                      }
+                      e.target.src = PLACEHOLDER_IMAGE;
                     }}
                   />
                 ) : (
-                  <div className="text-center text-gray-400">
-                    <div className="text-4xl mb-2">📷</div>
-                    <p>No image available</p>
+                  <div className="relative w-full h-full bg-black">
+                    <video
+                      ref={videoRef}
+                      src={currentMedia.url}
+                      className="w-full h-full object-contain"
+                      controls
+                      playsInline
+                      preload="auto"
+                    >
+                      <source src={currentMedia.url} type="video/mp4" />
+                      Your browser does not support the video tag.
+                    </video>
+                    
+                    {/* Video Badge */}
+                    <div className="absolute top-4 left-4 bg-red-600 text-white px-3 py-1.5 rounded-lg text-sm font-bold shadow-lg flex items-center">
+                      <FaVideo className="mr-1" /> VIDEO
+                    </div>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Thumbnail Images */}
-            {images.length > 1 && (
+            {/* Media Thumbnails (Images & Videos) */}
+            {mediaItems.length > 1 && (
               <div className="flex gap-2 overflow-x-auto pb-2">
-                {images.map((img, index) => (
+                {mediaItems.map((item, index) => (
                   <button
                     key={index}
-                    onClick={() => setSelectedImageIndex(index)}
-                    className={`flex-shrink-0 w-20 h-20 rounded-lg border-2 overflow-hidden ${
-                      selectedImageIndex === index 
-                        ? 'border-red-600' 
+                    onClick={() => handleMediaSelect(index)}
+                    className={`flex-shrink-0 w-20 h-20 rounded-lg border-2 overflow-hidden relative ${
+                      selectedMediaIndex === index 
+                        ? 'border-red-600 ring-2 ring-red-200' 
                         : 'border-transparent hover:border-gray-300'
                     }`}
                   >
-                    <img
-                      src={`http://localhost:5000/api/uploads/products/${img?.split('/').pop()}`}
-                      alt={`Thumbnail ${index + 1}`}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.target.onerror = null;
-                        e.target.src = '';
-                        e.target.style.display = 'none';
-                        e.target.parentNode.className += ' bg-gray-200 flex items-center justify-center';
-                        e.target.parentNode.innerHTML = '<span class="text-xs text-gray-400">Img</span>';
-                      }}
-                    />
+                    {item.type === 'image' ? (
+                      <img
+                        src={item.thumbnail}
+                        alt={`Thumbnail ${index + 1}`}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = PLACEHOLDER_THUMB;
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gray-800 flex items-center justify-center">
+                        <FaPlay size={20} className="text-white opacity-70" />
+                        <div className="absolute bottom-0 left-0 right-0 bg-red-600 text-white text-[8px] text-center py-0.5">
+                          VIDEO
+                        </div>
+                      </div>
+                    )}
                   </button>
                 ))}
               </div>
@@ -288,13 +384,13 @@ const ProductPage = () => {
               <div className="mb-6">
                 <div className="flex items-center gap-3">
                   <span className="text-3xl font-bold text-red-600">
-                    KSh {price.toLocaleString()}
+                    KSh {price?.toLocaleString() || '0'}
                   </span>
                   
-                  {product.is_on_offer && product.price && (
+                  {product.is_on_offer && originalPrice > price && (
                     <>
                       <span className="text-xl text-gray-400 line-through">
-                        KSh {product.price.toLocaleString()}
+                        KSh {originalPrice.toLocaleString()}
                       </span>
                       <span className="bg-red-100 text-red-800 px-2 py-1 rounded font-bold">
                         Save {discount}%
@@ -455,20 +551,34 @@ const ProductPage = () => {
           <div className="mt-12">
             <h2 className="text-2xl font-bold mb-6">Related Products</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-              {relatedProducts.map(relatedProduct => (
+              {relatedProducts
+                .filter(p => p.id !== product.id)
+                .slice(0, 4)
+                .map(relatedProduct => (
                 <div key={relatedProduct.id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-shadow">
                   <Link to={`/product/${relatedProduct.id}`}>
                     <div className="h-48 bg-gray-100 relative overflow-hidden">
                       {relatedProduct.image_urls && relatedProduct.image_urls.length > 0 ? (
                         <img 
-                          src={`http://localhost:5000/api/uploads/products/${relatedProduct.image_urls[0]?.split('/').pop()}`}
+                          src={relatedProduct.image_urls[0]} // Already relative
                           alt={relatedProduct.name}
                           className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = PLACEHOLDER_IMAGE;
+                          }}
                         />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-gray-200">
-                          <span className="text-gray-400">No Image</span>
+                      ) : relatedProduct.video_urls && relatedProduct.video_urls.length > 0 ? (
+                        <div className="w-full h-full bg-gray-800 flex items-center justify-center">
+                          <FaVideo className="text-white text-3xl" />
+                          <span className="text-white ml-2">Video</span>
                         </div>
+                      ) : (
+                        <img
+                          src={PLACEHOLDER_IMAGE}
+                          alt="No image"
+                          className="w-full h-full object-cover"
+                        />
                       )}
                     </div>
                     <div className="p-4">
@@ -476,7 +586,7 @@ const ProductPage = () => {
                         {relatedProduct.name}
                       </h3>
                       <div className="font-bold text-red-600">
-                        KSh {relatedProduct.price.toLocaleString()}
+                        KSh {(relatedProduct.selling_price || relatedProduct.price || 0).toLocaleString()}
                       </div>
                     </div>
                   </Link>

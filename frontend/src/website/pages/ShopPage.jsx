@@ -1,4 +1,4 @@
-// src/website/pages/ShopPage.jsx - FIXED with safe price handling
+// src/website/pages/ShopPage.jsx - FIXED with relative URLs and safe price handling
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { 
@@ -6,6 +6,9 @@ import {
   FaStar, FaStarHalfAlt, FaBox, FaTag, FaLayerGroup
 } from 'react-icons/fa';
 import { useCart } from '../context/CartContext';
+
+// Local placeholder data URI (no external dependencies)
+const PLACEHOLDER_IMAGE = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'300\' height=\'200\' viewBox=\'0 0 300 200\'%3E%3Crect width=\'300\' height=\'200\' fill=\'%23f0f0f0\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' dominant-baseline=\'middle\' text-anchor=\'middle\' font-family=\'Arial\' font-size=\'18\' fill=\'%23999\'%3ENo Image%3C/text%3E%3C/svg%3E';
 
 const ShopPage = () => {
   const [products, setProducts] = useState([]);
@@ -85,7 +88,7 @@ const ShopPage = () => {
     if (category) setSelectedCategory(category);
   }, [location]);
 
-  // Fetch products and categories
+  // Fetch products and categories - FIXED: using relative URLs
   useEffect(() => {
     fetchProducts();
     fetchCategories();
@@ -99,7 +102,8 @@ const ShopPage = () => {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:5000/api/products/products?limit=100');
+      // FIXED: using relative URL
+      const response = await fetch('/api/products/products?limit=100');
       const data = await response.json();
       const productsData = data.products || data;
       setProducts(productsData);
@@ -112,7 +116,8 @@ const ShopPage = () => {
 
   const fetchCategories = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/products/categories');
+      // FIXED: using relative URL
+      const response = await fetch('/api/products/categories');
       const data = await response.json();
       setCategories(data.categories || data);
     } catch (error) {
@@ -305,12 +310,13 @@ const ShopPage = () => {
                           <a href={`/product/${product.id}`}>
                             {product.image_urls && product.image_urls.length > 0 ? (
                               <img 
-                                src={`http://localhost:5000/api/uploads/products/${product.image_urls[0]?.split('/').pop()}`}
+                                // FIXED: Changed from localhost to relative URL
+                                src={`/api/uploads/products/${product.image_urls[0]?.split('/').pop()}`}
                                 alt={product.name}
                                 className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
                                 onError={(e) => {
                                   e.target.onerror = null;
-                                  e.target.src = 'https://via.placeholder.com/300x200?text=No+Image';
+                                  e.target.src = PLACEHOLDER_IMAGE;
                                 }}
                               />
                             ) : (

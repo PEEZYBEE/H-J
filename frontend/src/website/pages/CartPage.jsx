@@ -4,6 +4,9 @@ import { FaTrash, FaShoppingCart, FaArrowLeft, FaCreditCard } from 'react-icons/
 import { Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 
+// Local placeholder data URI (no external dependencies)
+const PLACEHOLDER_IMAGE = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'80\' height=\'80\' viewBox=\'0 0 80 80\'%3E%3Crect width=\'80\' height=\'80\' fill=\'%23f0f0f0\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' dominant-baseline=\'middle\' text-anchor=\'middle\' font-family=\'Arial\' font-size=\'12\' fill=\'%23999\'%3ENo Image%3C/text%3E%3C/svg%3E';
+
 const CartPage = () => {
   const { cartItems, removeFromCart, updateQuantity, clearCart, getUniqueItems, getTotalItems } = useCart();
 
@@ -144,12 +147,13 @@ const CartPage = () => {
                         <div className="w-20 h-20 flex-shrink-0">
                           {item.image_urls && item.image_urls.length > 0 ? (
                             <img 
-                              src={`http://localhost:5000/api/uploads/products/${item.image_urls[0]?.split('/').pop()}`}
+                              // FIXED: Changed from localhost to relative URL
+                              src={`/api/uploads/products/${item.image_urls[0]?.split('/').pop()}`}
                               alt={item.name}
                               className="w-full h-full object-cover rounded"
                               onError={(e) => {
                                 e.target.onerror = null;
-                                e.target.src = 'https://via.placeholder.com/80x80?text=No+Image';
+                                e.target.src = PLACEHOLDER_IMAGE;
                               }}
                             />
                           ) : (
