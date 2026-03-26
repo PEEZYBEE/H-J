@@ -1,3 +1,27 @@
 .env
 *.env
 .env.*
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtualenvs
+venv/
+env/
+.venv/
+
+# Secrets and keys
+secrets.json
+*.pem
+*.key
+*.p12
+*.jks
+
+# DB and uploads
+*.db
+*.sqlite3
+instance/
+static/uploads/
+static/uploads/**
