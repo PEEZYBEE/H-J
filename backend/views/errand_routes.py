@@ -1251,7 +1251,6 @@ def get_my_notifications():
             'success': True,
             'notifications': [n.to_dict() for n in notifications],
             'total': total,
-            'unread': 0  # TODO: Implement unread count
         })
         
     except Exception as e:

@@ -1,7 +1,10 @@
 from flask import Blueprint, request, jsonify, g
-from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, get_jwt
+from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity, get_jwt
+from flask import current_app
+from flask_mail import Message
 from datetime import datetime, timezone, timedelta
-from models import User
+from models import User, db
+from utils.auth_tokens import generate_token, verify_token
 from utils.schemas import AuthLoginSchema
 from marshmallow import ValidationError
 from functools import wraps
@@ -40,10 +43,12 @@ def _build_auth_response(user, status_code=200, message=None):
             'role': user.role
         }
     )
+    refresh_token = create_refresh_token(identity=user.id)
 
     payload = {
         'success': True,
         'access_token': access_token,
+        'refresh_token': refresh_token,
         'user': user.to_dict()
     }
     if message:
@@ -75,54 +80,10 @@ def role_required(required_roles):
 # ========== REGISTER ==========
 @auth_bp.route('/register', methods=['POST'])
 def register():
-    try:
-        from models import db
-        data = getattr(g, 'sanitized_json', None) or request.get_json(silent=True)
-        
-        # Validate required fields
-        if not data.get('username') or not data.get('email') or not data.get('password'):
-            return jsonify({'success': False, 'error': 'Missing required fields'}), 400
-        
-        # Check if user exists
-        if User.query.filter_by(username=data['username']).first():
-            return jsonify({'success': False, 'error': 'Username already exists'}), 400
-        
-        if User.query.filter_by(email=data['email']).first():
-            return jsonify({'success': False, 'error': 'Email already exists'}), 400
-        
-        # Create new user
-        user = User(
-            username=data['username'],
-            email=data['email'],
-            full_name=data.get('full_name', ''),
-            phone=data.get('phone', ''),
-            role=data.get('role', 'customer')
-        )
-        user.set_password(data['password'])
-        
-        db.session.add(user)
-        db.session.commit()
-        
-        # Create token for immediate login
-        access_token = create_access_token(
-            identity=user.id,
-            additional_claims={
-                'username': user.username,
-                'email': user.email,
-                'role': user.role
-            }
-        )
-        
-        return jsonify({
-            'success': True,
-            'message': 'User created successfully',
-            'access_token': access_token,
-            'user': user.to_dict()
-        }), 201
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
+    return jsonify({
+        'success': False,
+        'error': 'Self-registration is disabled. Please contact an admin to create your account.'
+    }), 403
 
 # ========== LOGIN ==========
 @auth_bp.route('/login', methods=['POST'])
@@ -140,27 +101,50 @@ def login():
         # Find user
         user = User.query.filter_by(username=data['username']).first()
         
+        # Check if account is locked due to repeated failures
+        now = datetime.utcnow()
+        if user and getattr(user, 'locked_until', None) and user.locked_until > now:
+            current_app.logger.warning('Locked login attempt username=%s ip=%s locked_until=%s', data.get('username'), request.remote_addr, user.locked_until)
+            return jsonify({'success': False, 'error': 'Account temporarily locked due to failed login attempts'}), 403
+
         if not user or not user.check_password(data['password']):
+            # Increment failed attempts if user exists
+            if user:
+                try:
+                    user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
+                    # Lock after 5 failed attempts for 15 minutes
+                    if user.failed_login_attempts >= int(os.getenv('MAX_FAILED_LOGIN', 5)):
+                        user.locked_until = now + timedelta(minutes=int(os.getenv('LOCK_MINUTES', 15)))
+                    from models import db
+                    db.session.add(user)
+                    db.session.commit()
+                except Exception:
+                    pass
+
+            current_app.logger.warning('Failed login username=%s ip=%s', data.get('username'), request.remote_addr)
             return jsonify({'success': False, 'error': 'Invalid credentials'}), 401
         
         if not user.is_active:
             return jsonify({'success': False, 'error': 'Account is disabled'}), 403
+
+        # Email verification is not required for login
         
-        # Create access token
-        access_token = create_access_token(
-            identity=user.id,
-            additional_claims={
-                'username': user.username,
-                'email': user.email,
-                'role': user.role
-            }
-        )
-        
-        return jsonify({
-            'success': True,
-            'access_token': access_token,
-            'user': user.to_dict()
-        }), 200
+        # Reset failed attempts on successful login
+        try:
+            user.failed_login_attempts = 0
+            user.locked_until = None
+            from models import db
+            db.session.add(user)
+            db.session.commit()
+        except Exception:
+            pass
+
+        # Create access + refresh tokens
+        access_token = create_access_token(identity=user.id, additional_claims={'username': user.username, 'email': user.email, 'role': user.role})
+        refresh_token = create_refresh_token(identity=user.id)
+
+        current_app.logger.info('Successful login user_id=%s username=%s ip=%s', user.id, user.username, request.remote_addr)
+        return jsonify({'success': True, 'access_token': access_token, 'refresh_token': refresh_token, 'user': user.to_dict()}), 200
         
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -178,6 +162,12 @@ def google_auth():
 
         if action not in ['login', 'register']:
             return jsonify({'success': False, 'error': 'Invalid action'}), 400
+
+        if action == 'register':
+            return jsonify({
+                'success': False,
+                'error': 'Self-registration is disabled. Please contact an admin to create your account.'
+            }), 403
 
         if not credential:
             return jsonify({'success': False, 'error': 'Missing Google credential'}), 400
@@ -208,36 +198,16 @@ def google_auth():
 
         if action == 'login':
             if not user:
-                return jsonify({'success': False, 'error': 'No account found for this Google email. Please register with Google first.'}), 404
+                current_app.logger.warning('Google login attempted for unknown email=%s ip=%s', email, request.remote_addr)
+                return jsonify({'success': False, 'error': 'No account found for this Google email. Please contact an admin to create your account.'}), 404
 
             if not user.is_active:
                 return jsonify({'success': False, 'error': 'Account is disabled'}), 403
 
+            current_app.logger.info('Google login successful user_id=%s email=%s ip=%s', user.id, email, request.remote_addr)
             return _build_auth_response(user, message='Google login successful')
 
-        # action == register
-        if user:
-            return jsonify({'success': False, 'error': 'An account with this Google email already exists. Please use Google login.'}), 409
-
-        valid_roles = ['admin', 'manager', 'senior', 'receiver', 'cashier', 'customer', 'errand']
-        role = selected_role if selected_role in valid_roles else 'cashier'
-
-        new_user = User(
-            username=_generate_unique_username(email, full_name),
-            email=email,
-            full_name=full_name,
-            phone=phone,
-            role=role,
-            is_active=True
-        )
-        # Set a random password to satisfy required password_hash field.
-        new_user.set_password(secrets.token_urlsafe(32))
-
-        from models import db
-        db.session.add(new_user)
-        db.session.commit()
-
-        return _build_auth_response(new_user, status_code=201, message='Google registration successful')
+        return jsonify({'success': False, 'error': 'Invalid action'}), 400
 
     except Exception as e:
         db.session.rollback()
@@ -253,11 +223,125 @@ def logout():
         token = TokenBlocklist(jti=jti, created_at=datetime.now(timezone.utc))
         db.session.add(token)
         db.session.commit()
-        
+        current_app.logger.info('Logout token jti=%s ip=%s', jti, request.remote_addr)
         return jsonify({'success': True, 'message': 'Successfully logged out'}), 200
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ========== EMAIL VERIFICATION ==========
+@auth_bp.route('/verify-email', methods=['GET', 'POST'])
+def verify_email():
+    try:
+        token = request.args.get('token') or (request.get_json() or {}).get('token')
+        if not token:
+            return jsonify({'success': False, 'error': 'Missing token'}), 400
+
+        # Token expires in 24 hours
+        data = verify_token(token, 'email-verify', max_age=60 * 60 * 24)
+        user_id = data.get('user_id')
+        from models import db
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({'success': False, 'error': 'User not found'}), 404
+
+        user.is_email_verified = True
+        user.email_verified_at = datetime.utcnow()
+        db.session.add(user)
+        db.session.commit()
+        current_app.logger.info('Email verified user_id=%s email=%s ip=%s', user.id, user.email, request.remote_addr)
+        return jsonify({'success': True, 'message': 'Email verified successfully'}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
+# ========== RESEND VERIFICATION ==========
+@auth_bp.route('/resend-verification', methods=['POST'])
+def resend_verification():
+    try:
+        data = request.get_json() or {}
+        email = (data.get('email') or '').strip().lower()
+        if not email:
+            return jsonify({'success': False, 'error': 'Email is required'}), 400
+
+        user = User.query.filter_by(email=email).first()
+        if not user:
+            return jsonify({'success': False, 'error': 'No account with that email'}), 404
+
+        if user.is_email_verified:
+            return jsonify({'success': False, 'error': 'Email already verified'}), 400
+
+        token = generate_token({'user_id': user.id, 'email': user.email}, 'email-verify')
+        frontend = os.getenv('FRONTEND_URL', '').rstrip('/')
+        verify_url = f"{frontend}/verify-email?token={token}" if frontend else f"/api/auth/verify-email?token={token}"
+        msg = Message(subject='Verify your email', recipients=[user.email])
+        msg.body = f"Verify your email: {verify_url}\nIf you did not request this, ignore this message."
+        from app import mail
+        mail.send(msg)
+        current_app.logger.info('Resent verification email user_id=%s email=%s ip=%s', user.id, user.email, request.remote_addr)
+        return jsonify({'success': True, 'message': 'Verification email sent'}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ========== PASSWORD RESET (REQUEST) ==========
+@auth_bp.route('/request-password-reset', methods=['POST'])
+def request_password_reset():
+    try:
+        data = request.get_json() or {}
+        email = (data.get('email') or '').strip().lower()
+        if not email:
+            return jsonify({'success': False, 'error': 'Email is required'}), 400
+
+        user = User.query.filter_by(email=email).first()
+        if not user:
+            # Do not reveal whether the email exists
+            current_app.logger.info('Password reset requested for unknown email=%s ip=%s', email, request.remote_addr)
+            return jsonify({'success': True, 'message': 'If an account exists, a reset email has been sent'}), 200
+
+        token = generate_token({'user_id': user.id}, 'password-reset')
+        frontend = os.getenv('FRONTEND_URL', '').rstrip('/')
+        reset_url = f"{frontend}/reset-password?token={token}" if frontend else f"/api/auth/reset-password?token={token}"
+        msg = Message(subject='Password reset', recipients=[user.email])
+        msg.body = f"Reset your password: {reset_url}\nThis link expires in 2 hours. If you did not request this, ignore."
+        from app import mail
+        mail.send(msg)
+        current_app.logger.info('Password reset requested user_id=%s email=%s ip=%s', user.id, user.email, request.remote_addr)
+        return jsonify({'success': True, 'message': 'If an account exists, a reset email has been sent'}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ========== PASSWORD RESET (CONFIRM) ==========
+@auth_bp.route('/reset-password', methods=['POST'])
+def reset_password():
+    try:
+        data = request.get_json() or {}
+        token = data.get('token') or request.args.get('token')
+        new_password = data.get('password')
+        if not token or not new_password:
+            return jsonify({'success': False, 'error': 'Token and new password are required'}), 400
+
+        # Token valid for 2 hours
+        payload = verify_token(token, 'password-reset', max_age=60 * 60 * 2)
+        user_id = payload.get('user_id')
+        from models import db
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({'success': False, 'error': 'User not found'}), 404
+
+        user.set_password(new_password)
+        # Reset failed attempts / locks
+        user.failed_login_attempts = 0
+        user.locked_until = None
+        db.session.add(user)
+        db.session.commit()
+        current_app.logger.info('Password reset completed user_id=%s ip=%s', user.id, request.remote_addr)
+
+        return jsonify({'success': True, 'message': 'Password reset successfully'}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
 
 # ========== GET CURRENT USER ==========
 @auth_bp.route('/me', methods=['GET'])
@@ -363,7 +447,7 @@ def create_user(current_user):
                 return jsonify({'success': False, 'error': f'{field} is required'}), 400
         
         # Validate role
-        valid_roles = ['admin', 'manager', 'senior', 'receiver', 'cashier', 'customer']
+        valid_roles = ['admin', 'manager', 'senior', 'receiver', 'cashier', 'customer', 'errand']
         if data['role'] not in valid_roles:
             return jsonify({'success': False, 'error': 'Invalid role specified'}), 400
         
@@ -426,7 +510,9 @@ def update_user(current_user, user_id):
         if not user:
             return jsonify({'success': False, 'error': 'User not found'}), 404
         
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return jsonify({'success': False, 'error': 'Invalid request payload'}), 400
         
         # Prevent admin from modifying their own role/status via API (safety)
         if user.id == current_user.id and data.get('role'):
@@ -450,7 +536,7 @@ def update_user(current_user, user_id):
             user.phone = data['phone']
         
         if 'role' in data:
-            valid_roles = ['admin', 'manager', 'senior', 'receiver', 'cashier', 'customer']
+            valid_roles = ['admin', 'manager', 'senior', 'receiver', 'cashier', 'customer', 'errand']
             if data['role'] not in valid_roles:
                 return jsonify({'success': False, 'error': 'Invalid role'}), 400
             user.role = data['role']
@@ -459,7 +545,7 @@ def update_user(current_user, user_id):
             user.is_active = data['is_active']
         
         if 'password' in data and data['password']:
-            user.password_hash = bcrypt.generate_password_hash(data['password']).decode('utf-8')
+            user.set_password(data['password'])
         
         db.session.commit()
         
@@ -535,7 +621,7 @@ def toggle_user_active(current_user, user_id):
 def get_user_stats(current_user):
     try:
         # Count users by role
-        roles = ['admin', 'manager', 'senior', 'receiver', 'cashier', 'customer']
+        roles = ['admin', 'manager', 'senior', 'receiver', 'cashier', 'customer', 'errand']
         stats = {}
         
         for role in roles:

@@ -129,7 +129,7 @@ const Footer = () => {
                     className="hover:text-white transition-colors duration-300 text-sm flex items-center group"
                   >
                     <span className="w-0 group-hover:w-2 h-0.5 bg-white mr-0 group-hover:mr-2 transition-all duration-300"></span>
-                    Login / Register
+                    Login
                   </NavLink>
                 </li>
               )}

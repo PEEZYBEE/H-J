@@ -1,6 +1,6 @@
 # ~/hnj/backend/models.py - ULTIMATE FIXED VERSION - WITH VIDEO SUPPORT
 from datetime import datetime, date
-from flask_bcrypt import generate_password_hash, check_password_hash
+from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 
 # Create the SQLAlchemy db here to avoid circular imports between app and models
@@ -253,6 +253,40 @@ class Product(db.Model):
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
 
+
+# ==================== FLASH SALE MODEL ====================
+# Association table for many-to-many between flash sales and products
+flashsale_products = db.Table(
+    'flashsale_products',
+    db.Column('flashsale_id', db.Integer, db.ForeignKey('flash_sales.id'), primary_key=True),
+    db.Column('product_id', db.Integer, db.ForeignKey('products.id'), primary_key=True)
+)
+
+class FlashSale(db.Model):
+    __tablename__ = 'flash_sales'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), default='Flash Sale')
+    start_time = db.Column(db.DateTime)
+    end_time = db.Column(db.DateTime, nullable=False)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    products = db.relationship('Product', secondary=flashsale_products, backref=db.backref('flash_sales', lazy='dynamic'))
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'start_time': self.start_time.isoformat() if self.start_time else None,
+            'end_time': self.end_time.isoformat() if self.end_time else None,
+            'is_active': self.is_active,
+            'product_ids': [p.id for p in self.products],
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
 # ==================== RECEIVING BATCH MODEL ====================
 class ReceivingBatch(db.Model):
     __tablename__ = 'receiving_batches'
@@ -366,6 +400,10 @@ class User(db.Model):
     username = db.Column(db.String(50), unique=True, nullable=False)
     email = db.Column(db.String(100), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
+    is_email_verified = db.Column(db.Boolean, default=False)
+    email_verified_at = db.Column(db.DateTime)
+    failed_login_attempts = db.Column(db.Integer, default=0)
+    locked_until = db.Column(db.DateTime)
     role = db.Column(db.String(20), nullable=False, default='customer')
     full_name = db.Column(db.String(100))
     phone = db.Column(db.String(20))
@@ -396,7 +434,8 @@ class User(db.Model):
     inventory_transactions = db.relationship('InventoryTransaction', back_populates='creator', lazy=True)
     
     def set_password(self, password):
-        self.password_hash = generate_password_hash(password).decode('utf-8')
+        # Use Werkzeug's PBKDF2 with SHA256 for deterministic, secure hashing
+        self.password_hash = generate_password_hash(password, method='pbkdf2:sha256', salt_length=16)
     
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)

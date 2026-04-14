@@ -424,7 +424,6 @@ const RecommendedSuggestions = ({ cartItems, getItemPrice, formatCurrency }) => 
             }
             if (results.length >= 8) break;
           } catch (err) {
-            console.warn('Subcategory fetch failed', subId, err);
           }
         }
 
@@ -443,7 +442,6 @@ const RecommendedSuggestions = ({ cartItems, getItemPrice, formatCurrency }) => 
               }
               if (results.length >= 8) break;
             } catch (err) {
-              console.warn('Category fetch failed', catId, err);
             }
           }
         }

@@ -123,7 +123,6 @@ def save_mpesa_payment_to_db(account_reference, transaction_details, checkout_re
         print(f"✅ Payment saved successfully!")
         print(f"   Order #{order.order_number} - payment recorded (awaiting admin confirmation)")
         print(f"   Payment ID: {payment.id}")
-        # NOTE: SMS sending moved to admin confirmation step. Do not auto-send here.
         return True
         
     except Exception as e:
@@ -649,7 +648,6 @@ def callback():
                 print(f"⚠️  Database save error (non-critical): {db_error}")
                 # Continue even if database save fails
             
-            # TODO: Send confirmation email/SMS to customer
             
         else:
             # Payment failed

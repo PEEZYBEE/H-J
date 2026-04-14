@@ -61,16 +61,12 @@ const PaymentPage = () => {
           setInfoMessage(prev => prev + ' 🔧 Sandbox Mode Active');
         }
       } catch (error) {
-        console.log('Could not determine environment:', error);
       }
       
       // Check if order has REAL database ID
       if (orderData.orderId && typeof orderData.orderId === 'number') {
         setIsDatabaseOrder(true);
-        console.log(`✅ REAL DATABASE ORDER ID: ${orderData.orderId}`);
-        console.log(`   Order Number: ${orderData.orderNumber}`);
       } else {
-        console.warn('⚠️ No real order ID found. Using fallback.');
         setIsDatabaseOrder(false);
       }
     };
@@ -79,7 +75,6 @@ const PaymentPage = () => {
     
     // Redirect if no order data
     if (!orderData || !orderData.customerInfo || !orderData.shippingAddress) {
-      console.warn('Missing order data, redirecting to cart');
       navigate('/cart');
     }
   }, [orderData, navigate]);
@@ -182,11 +177,8 @@ const PaymentPage = () => {
     if (isDatabaseOrder && orderData.orderId) {
       // Use REAL database order ID
       orderId = orderData.orderId;
-      console.log(`🎯 Using REAL database Order ID: ${orderId}`);
-      console.log(`   Order Number: ${orderData.orderNumber}`);
     } else {
       // Fallback (should not happen if checkout worked)
-      console.warn('⚠️ No real order ID, using timestamp as fallback');
       orderId = `${Date.now()}`;
       setInfoMessage('⚠️ Using fallback order ID. Payment may not link to order.');
     }
@@ -198,7 +190,6 @@ const PaymentPage = () => {
 
     let result;
     if (isSandboxMode) {
-      console.log('🔧 Using sandbox test payment');
       result = await mpesaService.testPayment(
         paymentPhone, // Use user's entered phone
         total,
@@ -206,7 +197,6 @@ const PaymentPage = () => {
         orderData.orderNumber || orderId
       );
     } else {
-      console.log('🚀 Initiating REAL M-PESA STK Push');
       result = await mpesaService.initiateSTKPush(
         paymentPhone, // Use user's entered phone
         total,
@@ -248,10 +238,6 @@ const PaymentPage = () => {
   const processMpesaBuyGoods = async (txId) => {
     // For Buy Goods, we don't need to make an API call - just show instructions
     // User will pay directly via their M-PESA app
-    console.log('🛒 M-PESA Buy Goods selected');
-    console.log(`   Till Number: ${tillNumber}`);
-    console.log(`   Amount: KSh ${total}`);
-    
     // Show instructions for Buy Goods payment
     setInfoMessage(`💡 Pay via M-PESA Buy Goods:
 1. Go to M-PESA on your phone
@@ -304,8 +290,6 @@ const PaymentPage = () => {
         handlePaymentSuccess(result.data);
       } else if (result.resultCode === '1037' || result.resultCode === '1032') {
         // Keep waiting
-        console.log(`⏳ Payment status: ${statusInfo.message}`);
-        
         if (result.resultCode === '1037') {
           setMpesaStatus(prev => ({
             ...prev,
@@ -337,14 +321,8 @@ const PaymentPage = () => {
         setMpesaStatus(prev => ({ ...prev, isCheckingStatus: false }));
         return;
       }
-      
-      console.log(`🔍 Checking database for order payment status: ${realOrderId}`);
-      
       // Use the imported checkOrderPaymentStatus function
       const statusResult = await checkOrderPaymentStatus(realOrderId);
-      
-      console.log('📊 Database check result:', statusResult);
-      
       if (statusResult.success && statusResult.paid) {
         // Payment is confirmed in our database!
         handlePaymentSuccess({

@@ -39,10 +39,7 @@ const BatchReceiving = () => {
 
   const fetchProducts = async () => {
     try {
-      console.log('Fetching products...');
       const response = await getAllProducts({ limit: 100 });
-      console.log('Products response:', response);
-      
       // Handle response format
       let productsData = [];
       if (response.products && Array.isArray(response.products)) {
@@ -52,8 +49,6 @@ const BatchReceiving = () => {
       } else if (response.data && Array.isArray(response.data)) {
         productsData = response.data;
       }
-      
-      console.log(`Loaded ${productsData.length} products`);
       setProducts(productsData);
       
     } catch (error) {
@@ -68,15 +63,12 @@ const BatchReceiving = () => {
         { id: 6, sku: 'MG-CE-11', name: 'Ceramic Coffee Mug 350ml', price: 250, stock_quantity: 300 }
       ];
       setProducts(testProducts);
-      console.log('Using test products:', testProducts.length);
     }
   };
 
   const fetchSuppliers = async () => {
     try {
       const response = await getSuppliers();
-      console.log('Suppliers:', response);
-      
       let suppliersData = [];
       if (Array.isArray(response)) {
         suppliersData = response;
@@ -87,7 +79,6 @@ const BatchReceiving = () => {
       }
       
       setSuppliers(suppliersData);
-      console.log(`Loaded ${suppliersData.length} suppliers`);
     } catch (error) {
       console.error('Failed to fetch suppliers:', error);
     }
@@ -119,11 +110,7 @@ const BatchReceiving = () => {
         delivery_date: batchForm.delivery_date || undefined,
         delivery_notes: batchForm.delivery_notes || undefined
       };
-      
-      console.log('Creating batch:', batchData);
       const response = await createBatch(batchData);
-      console.log('Batch created:', response);
-      
       if (response.success || response.batch || response.data) {
         const batch = response.batch || response.data || response;
         setCurrentBatch(batch);
@@ -177,11 +164,7 @@ const BatchReceiving = () => {
         condition: itemForm.condition,
         batch_number: itemForm.batch_number || undefined
       };
-      
-      console.log('Adding item:', itemData);
       const response = await addBatchItem(currentBatch.id || currentBatch._id, itemData);
-      console.log('Item added:', response);
-      
       if (response.success || response.item || response.data) {
         const newItem = response.item || response.data || response;
         setBatchItems(prev => [...prev, newItem]);

@@ -30,8 +30,6 @@ const RejectedBatches = () => {
     try {
       setLoading(true);
       const response = await getMyRejectedBatches();
-      console.log('Rejected batches:', response);
-      
       const batches = response.batches || response.data?.batches || [];
       setRejectedBatches(Array.isArray(batches) ? batches : []);
     } catch (error) {
@@ -45,8 +43,6 @@ const RejectedBatches = () => {
     try {
       setLoading(true);
       const response = await getBatchRejectionDetails(batchId);
-      console.log('Batch details:', response);
-      
       setBatchDetails(response);
       setShowDetails(true);
     } catch (error) {

@@ -10,14 +10,24 @@ import {
   FaUpload,
   FaTrash,
   FaTimes,
-  FaFileInvoice
+  FaFileInvoice,
+  FaCloudUploadAlt,
+  FaSave
 } from 'react-icons/fa';
+import {
+  getOfflineErrandQueue,
+  addOfflineErrandDraft,
+  removeOfflineErrandDraft
+} from '../../services/offlineErrandQueue';
 
 const CreateRunnerErrand = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadingAll, setUploadingAll] = useState(false);
   const [errors, setErrors] = useState({});
+  const [offlineDrafts, setOfflineDrafts] = useState([]);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   
   // Photo states
   const [productPhoto, setProductPhoto] = useState(null);
@@ -39,6 +49,104 @@ const CreateRunnerErrand = () => {
     max_price: '',
     notes: ''
   });
+
+  useEffect(() => {
+    setOfflineDrafts(getOfflineErrandQueue());
+
+    // Load draft from sessionStorage if user came from DraftErrands page
+    const editingDraftJson = sessionStorage.getItem('editingDraft');
+    if (editingDraftJson) {
+      try {
+        const draft = JSON.parse(editingDraftJson);
+        setFormData(draft.formData || {});
+        if (draft.photoURLs && draft.photoURLs.length > 0) {
+          // Load product photo (first photo)
+          setProductPhotoPreview(draft.photoURLs[0]);
+          // Load receipt photo (second photo if available)
+          if (draft.photoURLs[1]) {
+            setReceiptPhotoPreview(draft.photoURLs[1]);
+          }
+        }
+        sessionStorage.removeItem('editingDraft');
+      } catch (err) {
+        console.error('Failed to load draft:', err);
+      }
+    }
+
+    const goOnline = () => setIsOnline(true);
+    const goOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', goOnline);
+    window.addEventListener('offline', goOffline);
+
+    return () => {
+      window.removeEventListener('online', goOnline);
+      window.removeEventListener('offline', goOffline);
+    };
+  }, []);
+
+  const fileToDataUrl = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  const dataUrlToFile = async (dataUrl, fileName) => {
+    const response = await fetch(dataUrl);
+    const blob = await response.blob();
+    return new File([blob], fileName, { type: blob.type || 'image/jpeg' });
+  };
+
+  const buildErrandPayload = (userId) => ({
+    type: 'sourcing',
+    product_name: formData.product_name,
+    quantity: parseInt(formData.quantity, 10),
+    market_location: formData.market_location,
+    preferred_vendor: formData.preferred_vendor,
+    max_price: parseFloat(formData.max_price),
+    notes: formData.notes || undefined,
+    assigned_to: userId,
+    status: 'submitted'
+  });
+
+  const submitPayload = async ({ token, errandData, productFile, receiptFile }) => {
+    const formDataObj = new FormData();
+
+    formDataObj.append('product_photo', productFile);
+    formDataObj.append('receipt_photo', receiptFile);
+    formDataObj.append('data', JSON.stringify(errandData));
+
+    const response = await fetch('/api/errands/with-submission', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`
+      },
+      body: formDataObj
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to submit errand');
+    }
+    return data;
+  };
+
+  const resetForm = () => {
+    setFormData({
+      product_name: '',
+      quantity: 1,
+      market_location: '',
+      preferred_vendor: '',
+      max_price: '',
+      notes: ''
+    });
+    setProductPhoto(null);
+    setProductPhotoPreview(null);
+    setReceiptPhoto(null);
+    setReceiptPhotoPreview(null);
+    setErrors({});
+  };
 
   // Product Photo Handlers
   const handleProductCameraCapture = (e) => {
@@ -131,56 +239,116 @@ const CreateRunnerErrand = () => {
       // Get current user (runner) ID
       const userData = JSON.parse(localStorage.getItem('user') || '{}');
 
-      // Create FormData for multipart upload
-      const formDataObj = new FormData();
-      
-      // Append photos
-      if (productPhoto) {
-        formDataObj.append('product_photo', productPhoto);
-      }
-      if (receiptPhoto) {
-        formDataObj.append('receipt_photo', receiptPhoto);
-      }
-      
-      // Append form fields as JSON string in a 'data' field
-      const errandData = {
-        type: 'sourcing',
-        product_name: formData.product_name,
-        quantity: parseInt(formData.quantity),
-        market_location: formData.market_location,
-        preferred_vendor: formData.preferred_vendor,
-        max_price: parseFloat(formData.max_price),
-        notes: formData.notes || undefined,
-        assigned_to: userData.id,
-        status: 'submitted'
-      };
-      
-      formDataObj.append('data', JSON.stringify(errandData));
-
-      console.log('Submitting runner errand with photos:', errandData);
-
-      const response = await fetch('/api/errands/with-submission', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: formDataObj
+      const errandData = buildErrandPayload(userData.id);
+      await submitPayload({
+        token,
+        errandData,
+        productFile: productPhoto,
+        receiptFile: receiptPhoto
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
-        alert('✅ Errand submitted for approval!');
-        navigate('/errands?tab=pending');
-      } else {
-        alert(data.message || 'Failed to create errand');
-      }
+      alert('✅ Errand submitted for approval!');
+      navigate('/errands?tab=pending');
     } catch (error) {
-      console.error('Error creating errand:', error);
-      alert('Failed to create errand');
+      alert(error.message || 'Failed to create errand');
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleSaveDraft = async () => {
+    if (!validateForm()) return;
+
+    if (!productPhoto || !receiptPhoto) {
+      alert('Please attach both photos before saving draft.');
+      return;
+    }
+
+    try {
+      const productPhotoDataUrl = await fileToDataUrl(productPhoto);
+      const receiptPhotoDataUrl = await fileToDataUrl(receiptPhoto);
+
+      const draft = {
+        id: `draft_${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        formData,
+        productPhotoDataUrl,
+        receiptPhotoDataUrl
+      };
+
+      const updatedQueue = addOfflineErrandDraft(draft);
+      setOfflineDrafts(updatedQueue);
+      resetForm();
+      alert('Draft saved locally. You can upload it when network is available.');
+    } catch (error) {
+      alert('Failed to save draft locally.');
+    }
+  };
+
+  const handleUploadAllPending = async () => {
+    if (!offlineDrafts.length) {
+      alert('No pending drafts to upload.');
+      return;
+    }
+
+    if (!navigator.onLine) {
+      alert('You are offline. Connect to internet, then upload pending drafts.');
+      return;
+    }
+
+    const token = localStorage.getItem('token');
+    const userData = JSON.parse(localStorage.getItem('user') || '{}');
+
+    if (!token || !userData?.id) {
+      alert('Please login again before uploading drafts.');
+      return;
+    }
+
+    setUploadingAll(true);
+    let successCount = 0;
+    let failedCount = 0;
+
+    for (const draft of offlineDrafts) {
+      try {
+        const productFile = await dataUrlToFile(draft.productPhotoDataUrl, `${draft.id}_product.jpg`);
+        const receiptFile = await dataUrlToFile(draft.receiptPhotoDataUrl, `${draft.id}_receipt.jpg`);
+
+        await submitPayload({
+          token,
+          errandData: {
+            ...draft.formData,
+            type: 'sourcing',
+            quantity: parseInt(draft.formData.quantity, 10),
+            max_price: parseFloat(draft.formData.max_price),
+            assigned_to: userData.id,
+            status: 'submitted'
+          },
+          productFile,
+          receiptFile
+        });
+
+        removeOfflineErrandDraft(draft.id);
+        successCount += 1;
+      } catch {
+        failedCount += 1;
+      }
+    }
+
+    setOfflineDrafts(getOfflineErrandQueue());
+    setUploadingAll(false);
+
+    if (failedCount === 0) {
+      alert(`Uploaded ${successCount} draft(s) successfully.`);
+      navigate('/errands?tab=pending');
+      return;
+    }
+
+    alert(`Uploaded ${successCount} draft(s). ${failedCount} draft(s) failed and remain queued.`);
+  };
+
+  const handleDeleteDraft = (draftId) => {
+    const updatedQueue = removeOfflineErrandDraft(draftId);
+    setOfflineDrafts(updatedQueue);
   };
 
   return (
@@ -203,7 +371,6 @@ const CreateRunnerErrand = () => {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow p-4 md:p-6">
-          
           {/* Product Information */}
           <div className="mb-6">
             <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
@@ -485,6 +652,14 @@ const CreateRunnerErrand = () => {
               Cancel
             </button>
             <button
+              type="button"
+              onClick={handleSaveDraft}
+              className="px-6 py-3 border border-blue-300 text-blue-700 rounded-lg hover:bg-blue-50 text-sm md:text-base flex items-center justify-center gap-2"
+            >
+              <FaSave />
+              Save Draft Offline
+            </button>
+            <button
               type="submit"
               disabled={submitting}
               className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2 text-sm md:text-base"
@@ -496,7 +671,7 @@ const CreateRunnerErrand = () => {
                 </>
               ) : (
                 <>
-                  <FaCheckCircle />
+                  {isOnline ? <FaCheckCircle /> : <FaCloudUploadAlt />}
                   Submit Errand
                 </>
               )}

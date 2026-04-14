@@ -52,8 +52,6 @@ const ErrandApproval = () => {
     try {
       // FIXED: Use relative URL
       const response = await fetchWithAuth(`/api/errands/${errandId}`);
-      console.log('Errand details for approval:', response);
-      
       const errandData = response.errand || response.data || response;
       setErrand(errandData);
       setSubmission(errandData.latest_submission);
@@ -67,7 +65,6 @@ const ErrandApproval = () => {
   };
 
   const handleImageError = (type) => {
-    console.log(`Failed to load ${type} image`);
     setImageErrors(prev => ({ ...prev, [type]: true }));
   };
 

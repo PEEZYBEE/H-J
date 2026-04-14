@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   FaEye, FaEdit, FaTrash, FaPlus, FaSearch, FaFilter, 
-  FaBoxOpen, FaTimes, FaSave, FaTag, FaPercent, FaUpload, FaImage, FaVideo, FaPlay
+  FaBoxOpen, FaTimes, FaSave, FaTag, FaPercent, FaUpload, FaImage, FaVideo, FaPlay, FaFire
 } from 'react-icons/fa';
 
 const Products = () => {
@@ -14,6 +14,7 @@ const Products = () => {
   const [editingProduct, setEditingProduct] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [categories, setCategories] = useState([]);
+  const [activeFlashSale, setActiveFlashSale] = useState(null);
   const [uploadingImages, setUploadingImages] = useState(false);
   const [uploadingVideos, setUploadingVideos] = useState(false);
   const imageInputRef = useRef(null);
@@ -31,7 +32,46 @@ const Products = () => {
   useEffect(() => {
     fetchProducts();
     fetchCategories();
+    fetchActiveFlashSale();
   }, []);
+
+  const fetchActiveFlashSale = async () => {
+    try {
+      const resp = await (await import('../services/api')).productsAPI.getActiveFlashSale();
+      setActiveFlashSale(resp.flashsale || null);
+    } catch (err) {
+      console.error('Error fetching active flash sale:', err);
+      setActiveFlashSale(null);
+    }
+  };
+
+  const toggleProductFlash = async (product) => {
+    try {
+      if (!activeFlashSale) {
+        alert('No active flash sale. Create one from the Flash Sale admin panel first.');
+        return;
+      }
+
+      const inSale = (activeFlashSale.product_ids || []).includes(product.id);
+      if (inSale) {
+        await (await import('../services/api')).productsAPI.removeProductFromFlashSale(activeFlashSale.id, product.id);
+        setActiveFlashSale((prev) => ({
+          ...prev,
+          product_ids: (prev.product_ids || []).filter(id => id !== product.id)
+        }));
+      } else {
+        await (await import('../services/api')).productsAPI.addProductsToFlashSale(activeFlashSale.id, [product.id]);
+        setActiveFlashSale((prev) => ({
+          ...prev,
+          product_ids: [...(prev.product_ids || []), product.id]
+        }));
+      }
+      alert('Flash sale membership updated');
+    } catch (err) {
+      console.error('Error toggling flash sale:', err);
+      alert('Failed to update flash sale membership');
+    }
+  };
 
   const fetchProducts = async () => {
     try {
@@ -336,9 +376,6 @@ const Products = () => {
         image_urls: (editForm.image_urls || []).filter((url) => typeof url === 'string' && url.trim()),
         video_urls: (editForm.video_urls || []).filter((url) => typeof url === 'string' && url.trim())
       };
-      
-      console.log('Sending update data:', dataToSend);
-      
       const response = await fetch(`/api/products/staff/products/${editingProduct}`, {
         method: 'PUT',
         headers: {
@@ -527,6 +564,15 @@ const Products = () => {
                   >
                     <FaEdit />
                   </button>
+                    <button
+                      onClick={() => toggleProductFlash(product)}
+                      className={`p-2 rounded-lg transition-colors ${
+                        (activeFlashSale && (activeFlashSale.product_ids || []).includes(product.id)) ? 'text-white bg-red-600 hover:bg-red-700' : 'text-yellow-600 hover:bg-yellow-50'
+                      }`}
+                      title="Toggle Flash Sale"
+                    >
+                      <FaFire />
+                    </button>
                 </div>
                 
                 <div className="flex items-center gap-4">

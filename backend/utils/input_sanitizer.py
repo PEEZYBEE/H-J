@@ -24,7 +24,8 @@ def sanitize_request_data(request) -> dict:
     sanitized = {'json': None, 'args': None, 'form': None}
 
     try:
-        if request.is_json:
+        # Only parse JSON for methods that support a body
+        if request.method in ('POST', 'PUT', 'PATCH') and request.is_json:
             data = request.get_json(silent=True)
             sanitized['json'] = sanitize_value(data)
     except Exception:

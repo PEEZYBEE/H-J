@@ -63,10 +63,7 @@ const MyErrands = () => {
       // FIXED: Changed to relative URL
       const response = await fetchWithAuth('/api/errands/my');
       
-      console.log('My errands response:', response); // Debug log
-      
       const errandsList = response.errands || response.data?.errands || response;
-      console.log('Errands list:', errandsList); // Debug log
       
       // Ensure errandsList is an array
       const errandsArray = Array.isArray(errandsList) ? errandsList : [];

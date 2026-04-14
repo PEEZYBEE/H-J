@@ -8,7 +8,6 @@ export const useCart = () => {
   
   // Don't throw error - return default values if context is not ready yet
   if (!context) {
-    console.warn('CartContext not available yet, returning default values');
     return {
       cartItems: [],
       addToCart: () => {},

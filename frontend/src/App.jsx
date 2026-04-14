@@ -35,6 +35,7 @@ import ErrandApproval from './pages/errand/ErrandApproval';
 import MyErrands from './pages/errand/MyErrands';
 import RunnerPerformance from './pages/errand/RunnerPerformance';  
 import ErrandDetails from './pages/errand/ErrandDetails';
+import DraftErrands from './pages/errand/DraftErrands';
 // =================================
 
 // Website System
@@ -158,6 +159,13 @@ function App() {
             <Route path="my" element={
               <ProtectedRoute allowedRoles={['errand']}>
                 <MyErrands />
+              </ProtectedRoute>
+            } />
+            
+            {/* Draft Errands page for runners */}
+            <Route path="drafts" element={
+              <ProtectedRoute allowedRoles={['errand']}>
+                <DraftErrands />
               </ProtectedRoute>
             } />
             

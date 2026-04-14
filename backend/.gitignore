@@ -25,3 +25,7 @@ secrets.json
 instance/
 static/uploads/
 static/uploads/**
+
+# Runtime logs
+logs/
+*.log

@@ -5,7 +5,8 @@ from datetime import datetime
 from flask import Blueprint, request, jsonify, current_app, send_from_directory, g
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from werkzeug.utils import secure_filename
-from models import db, Product, ProductCategory, ProductSubCategory, User
+from models import db, Product, ProductCategory, ProductSubCategory, User, FlashSale
+from datetime import datetime
 from utils.schemas import CreateProductSchema
 from marshmallow import ValidationError
 
@@ -1344,6 +1345,125 @@ def serve_folder_upload(folder, filename):
         )
     except Exception as e:
         return jsonify({'error': str(e)}), 404
+
+
+# ==================== FLASH SALE ENDPOINTS ====================
+@product_bp.route('/flashsales/active', methods=['GET'])
+def get_active_flashsale():
+    try:
+        now = datetime.utcnow()
+        sale = FlashSale.query.filter(FlashSale.is_active == True, FlashSale.end_time > now).order_by(FlashSale.id.desc()).first()
+        if not sale:
+            return jsonify({'flashsale': None, 'products': []}), 200
+
+        products = [p.to_dict() for p in sale.products]
+        return jsonify({'flashsale': sale.to_dict(), 'products': products}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@product_bp.route('/staff/flashsales', methods=['POST'])
+@jwt_required()
+def create_or_update_flashsale():
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        if not user or user.role not in ('admin', 'staff'):
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        data = request.get_json() or {}
+        sale_id = data.get('id')
+        name = data.get('name', 'Flash Sale')
+        start_time = data.get('start_time')
+        end_time = data.get('end_time')
+        is_active = data.get('is_active', True)
+
+        if not end_time:
+            return jsonify({'error': 'end_time is required (ISO format)'}), 400
+
+        # parse datetimes
+        try:
+            start_dt = datetime.fromisoformat(start_time) if start_time else None
+            end_dt = datetime.fromisoformat(end_time)
+        except Exception:
+            return jsonify({'error': 'Invalid datetime format. Use ISO format.'}), 400
+
+        if sale_id:
+            sale = FlashSale.query.get(sale_id)
+            if not sale:
+                return jsonify({'error': 'FlashSale not found'}), 404
+            sale.name = name
+            sale.start_time = start_dt
+            sale.end_time = end_dt
+            sale.is_active = bool(is_active)
+        else:
+            sale = FlashSale(name=name, start_time=start_dt, end_time=end_dt, is_active=bool(is_active))
+            db.session.add(sale)
+
+        db.session.commit()
+        return jsonify({'flashsale': sale.to_dict()}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@product_bp.route('/staff/flashsales/<int:flashsale_id>/products', methods=['POST'])
+@jwt_required()
+def add_products_to_flashsale(flashsale_id):
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        if not user or user.role not in ('admin', 'staff'):
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        sale = FlashSale.query.get(flashsale_id)
+        if not sale:
+            return jsonify({'error': 'FlashSale not found'}), 404
+
+        data = request.get_json() or {}
+        product_ids = data.get('product_ids') or []
+        if not isinstance(product_ids, list):
+            return jsonify({'error': 'product_ids must be a list'}), 400
+
+        added = []
+        for pid in product_ids:
+            prod = Product.query.get(pid)
+            if prod and prod not in sale.products:
+                sale.products.append(prod)
+                added.append(pid)
+
+        db.session.commit()
+        return jsonify({'added': added, 'flashsale': sale.to_dict()}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@product_bp.route('/staff/flashsales/<int:flashsale_id>/products/<int:product_id>', methods=['DELETE'])
+@jwt_required()
+def remove_product_from_flashsale(flashsale_id, product_id):
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        if not user or user.role not in ('admin', 'staff'):
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        sale = FlashSale.query.get(flashsale_id)
+        if not sale:
+            return jsonify({'error': 'FlashSale not found'}), 404
+
+        prod = Product.query.get(product_id)
+        if not prod:
+            return jsonify({'error': 'Product not found'}), 404
+
+        if prod in sale.products:
+            sale.products.remove(prod)
+            db.session.commit()
+
+        return jsonify({'removed': product_id, 'flashsale': sale.to_dict()}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
 
 # Error handlers
 @product_bp.errorhandler(404)

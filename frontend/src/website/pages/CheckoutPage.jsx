@@ -67,18 +67,7 @@ const CheckoutPage = () => {
 
   // Debug logging
   useEffect(() => {
-    console.log('🛒 Checkout Page - Cart Items:', cartItems);
-    console.log('💰 Context Total:', contextTotal);
-    console.log('💰 Manual Total:', manualTotal);
-    console.log('💰 Using Total:', total);
-    
     cartItems.forEach((item, index) => {
-      console.log(`Item ${index}:`, {
-        name: item.name,
-        price: getItemPrice(item),
-        quantity: item.quantity,
-        total: getItemPrice(item) * (item.quantity || 1)
-      });
     });
   }, [cartItems, contextTotal, manualTotal, total]);
 
@@ -202,8 +191,6 @@ const CheckoutPage = () => {
 
   const createOrderInDatabase = async () => {
     try {
-      console.log('📝 Creating order in database...');
-      
       const token = localStorage.getItem('access_token');
       const headers = {
         'Content-Type': 'application/json'
@@ -244,10 +231,6 @@ const CheckoutPage = () => {
         notes: `Delivery: ${shippingAddress.deliveryMode}${shippingAddress.deliveryDetails ? ` (${shippingAddress.deliveryDetails})` : ''}. ${shippingAddress.additionalInfo || ''}`,
         items: orderItems
       };
-  
-      console.log('📦 Sending order to:', '/api/orders/orders');
-      console.log('📦 Order payload:', orderPayload);
-  
       // FIXED: Using relative URL instead of localhost
       const response = await fetch('/api/orders/orders', {
         method: 'POST',
@@ -261,8 +244,6 @@ const CheckoutPage = () => {
         console.error('❌ Server response:', data);
         throw new Error(data.error || `Server error: ${response.status}`);
       }
-  
-      console.log('✅ Order created successfully:', data);
       return data;
   
     } catch (error) {
@@ -340,9 +321,6 @@ const CheckoutPage = () => {
         realOrder: orderResponse.order,
         createdAt: new Date().toISOString()
       };
-
-      console.log('🎯 Navigate to payment with REAL order ID:', orderData.orderId);
-      
       navigate('/payment', { 
         state: { 
           orderData: orderData,

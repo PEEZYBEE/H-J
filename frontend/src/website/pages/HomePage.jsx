@@ -45,6 +45,9 @@ const HomePage = () => {
   const [recentSearches, setRecentSearches] = useState([]);
   const [popularSearches, setPopularSearches] = useState(['Notebooks', 'Laundry', 'Kitchen', 'Bottles', 'Toys']);
   const [showFilters, setShowFilters] = useState(false);
+  const [flashSale, setFlashSale] = useState(null);
+  const [flashProducts, setFlashProducts] = useState([]);
+  const [flashTimeLeft, setFlashTimeLeft] = useState('');
   const [filters, setFilters] = useState({
     category: 'all',
     minPrice: '',
@@ -60,6 +63,7 @@ const HomePage = () => {
   useEffect(() => {
     fetchProducts();
     fetchCategories();
+    fetchFlashSale();
     loadRecentSearches();
     
     // Click outside to close suggestions
@@ -72,6 +76,46 @@ const HomePage = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const fetchFlashSale = async () => {
+    try {
+      const resp = await productsAPI.getActiveFlashSale();
+      if (resp && resp.flashsale) {
+        setFlashSale(resp.flashsale);
+        setFlashProducts(resp.products || []);
+      } else {
+        setFlashSale(null);
+        setFlashProducts([]);
+      }
+    } catch (err) {
+      console.error('Error fetching flash sale:', err);
+      setFlashSale(null);
+      setFlashProducts([]);
+    }
+  };
+
+  // Countdown timer for flash sale
+  useEffect(() => {
+    if (!flashSale || !flashSale.end_time) {
+      setFlashTimeLeft('00:00:00');
+      return;
+    }
+
+    const update = () => {
+      const end = new Date(flashSale.end_time).getTime();
+      const now = Date.now();
+      const diff = Math.max(0, end - now);
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+      const fmt = [hours, minutes, seconds].map(v => String(v).padStart(2, '0')).join(':');
+      setFlashTimeLeft(fmt);
+    };
+
+    update();
+    const iv = setInterval(update, 1000);
+    return () => clearInterval(iv);
+  }, [flashSale]);
+
   useEffect(() => {
     if (searchQuery.length >= 2) {
       generateSuggestions();
@@ -83,7 +127,6 @@ const HomePage = () => {
   const fetchProducts = async () => {
     try {
       const response = await productsAPI.getAllProducts({ limit: 100 });
-      console.log('Products response:', response); // Debug log
       // Make sure we're setting an array
       const productsData = response.products || response || [];
       setProducts(Array.isArray(productsData) ? productsData : []);
@@ -277,7 +320,6 @@ const HomePage = () => {
     if (category) {
       navigate(`/shop?category=${category.id}`);
     } else {
-      console.warn(`Category with code ${categoryCode} not found`);
       navigate('/shop');
     }
   };
@@ -561,7 +603,7 @@ const HomePage = () => {
                   <span className="text-3xl">⚡</span>
                   <h2 className="text-2xl font-bold text-gray-900">Flash Sale</h2>
                   <span className="bg-red-600 text-white px-3 py-1 rounded-full text-sm font-bold flex items-center gap-1">
-                    <FaClock /> 01:23:45
+                    <FaClock /> {flashTimeLeft || '00:00:00'}
                   </span>
                 </div>
                 <Link to="/shop?sort=flashsale" className="text-red-600 text-base hover:underline font-medium">
@@ -575,9 +617,9 @@ const HomePage = () => {
                     <div key={i} className="bg-gray-200 h-64 rounded-lg animate-pulse"></div>
                   ))}
                 </div>
-              ) : products && Array.isArray(products) && products.length > 0 ? (
+              ) : flashProducts && Array.isArray(flashProducts) && flashProducts.length > 0 ? (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                  {products.slice(0, 4).map(product => {
+                  {flashProducts.slice(0, 4).map(product => {
                     const price = getProductPrice(product);
                     return (
                       <div key={product.id} className="group cursor-pointer bg-gray-50 rounded-lg p-4 hover:shadow-lg transition-shadow" onClick={() => navigate(`/product/${product.id}`)}>

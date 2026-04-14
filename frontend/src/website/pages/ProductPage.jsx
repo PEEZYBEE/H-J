@@ -49,7 +49,6 @@ const ProductPage = () => {
     if (mediaType === 'video' && videoRef.current) {
       setTimeout(() => {
         videoRef.current.play().catch(e => {
-          console.log('Autoplay prevented:', e);
         });
       }, 100);
     }

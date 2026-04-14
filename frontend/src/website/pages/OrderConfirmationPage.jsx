@@ -80,7 +80,6 @@ const OrderConfirmationPage = () => {
         // backend might return order under `order` or directly
         setFetchedOrder(data.order || data || null);
       } catch (err) {
-        console.warn('Failed to fetch order by id', err);
       }
     };
 
@@ -151,7 +150,6 @@ const OrderConfirmationPage = () => {
           }
           if (results.length >= 8) break;
         } catch (err) {
-          console.warn('Subcategory fetch failed', subId, err);
         }
       }
 
@@ -171,7 +169,6 @@ const OrderConfirmationPage = () => {
             }
             if (results.length >= 8) break;
           } catch (err) {
-            console.warn('Category fetch failed', catId, err);
           }
         }
       }

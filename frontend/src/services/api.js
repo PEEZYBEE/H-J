@@ -4,12 +4,28 @@ import axios from 'axios';
 const API_BASE_URL = '/api';
 
 // Create axios instance with base URL
+
 const api = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
+
+// Add Content-Type only for requests with a body
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    // Only set Content-Type for methods with a body
+    if (['post', 'put', 'patch'].includes(config.method)) {
+      if (!config.headers['Content-Type']) {
+        config.headers['Content-Type'] = 'application/json';
+      }
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
 // Add token to requests if available
 api.interceptors.request.use(
@@ -190,6 +206,23 @@ export const productsAPI = {
         'Content-Type': 'multipart/form-data',
       },
     });
+    return response.data;
+  },
+  // ===== FLASH SALE API =====
+  getActiveFlashSale: async () => {
+    const response = await api.get('/products/flashsales/active');
+    return response.data;
+  },
+  createOrUpdateFlashSale: async (saleData) => {
+    const response = await api.post('/products/staff/flashsales', saleData);
+    return response.data;
+  },
+  addProductsToFlashSale: async (flashsaleId, productIds) => {
+    const response = await api.post(`/products/staff/flashsales/${flashsaleId}/products`, { product_ids: productIds });
+    return response.data;
+  },
+  removeProductFromFlashSale: async (flashsaleId, productId) => {
+    const response = await api.delete(`/products/staff/flashsales/${flashsaleId}/products/${productId}`);
     return response.data;
   },
 };

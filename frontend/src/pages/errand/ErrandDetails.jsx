@@ -45,8 +45,6 @@ const ErrandDetails = () => {
       setLoading(true);
       // FIXED: Changed to relative URL
       const response = await fetchWithAuth(`/api/errands/${errandId}`);
-      console.log('Errand details:', response);
-      
       const errandData = response.errand || response.data || response;
       setErrand(errandData);
     } catch (error) {

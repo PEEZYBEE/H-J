@@ -57,8 +57,7 @@ const Dashboard = () => {
     const token = localStorage.getItem('token');
     return fetch(url, {
       headers: {
-        'Authorization': token ? `Bearer ${token}` : '',
-        'Content-Type': 'application/json'
+        'Authorization': token ? `Bearer ${token}` : ''
       }
     }).then(res => res.json()).catch(() => ({}));
   };
@@ -66,8 +65,6 @@ const Dashboard = () => {
   useEffect(() => {
     const userData = JSON.parse(localStorage.getItem('user') || '{}');
     const token = localStorage.getItem('token');
-    console.log('Dashboard - User:', userData);
-    console.log('Dashboard - Token exists:', !!token);
     setUser(userData);
     
     if (userData.role) {
@@ -240,7 +237,6 @@ const Dashboard = () => {
     try {
       // FIXED: using relative URLs
       const batchesRes = await fetchWithAuth('/api/receiving/my-batches');
-      console.log('My batches response:', batchesRes);
       
       const batches = batchesRes.batches || batchesRes.data?.batches || [];
       const pendingBatches = batches.filter(b => 
@@ -250,7 +246,6 @@ const Dashboard = () => {
       let rejectedCount = 0;
       try {
         const rejectedRes = await fetchWithAuth('/api/receiving/my-rejected-batches');
-        console.log('Rejected batches response:', rejectedRes);
         const rejectedBatches = rejectedRes.batches || rejectedRes.data?.batches || [];
         rejectedCount = rejectedBatches.length || 0;
       } catch (err) {
@@ -291,7 +286,6 @@ const Dashboard = () => {
     try {
       // FIXED: using relative URLs
       const statsRes = await fetchWithAuth('/api/stats/runner');
-      console.log('Errand stats response:', statsRes);
       
       if (statsRes.success && statsRes.stats) {
         return {

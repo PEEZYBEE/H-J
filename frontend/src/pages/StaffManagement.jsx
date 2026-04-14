@@ -10,6 +10,7 @@ import {
   FaTruck,
   FaCashRegister,
   FaUserShield,
+  FaMotorcycle,
   FaSearch,
   FaFilter,
   FaSync
@@ -47,6 +48,7 @@ const StaffManagement = () => {
     { value: 'senior', label: 'Senior Staff', icon: <FaClipboardCheck className="text-orange-600" />, color: 'from-orange-500 to-red-500' },
     { value: 'receiver', label: 'Receiver', icon: <FaTruck className="text-green-600" />, color: 'from-green-500 to-emerald-500' },
     { value: 'cashier', label: 'Cashier', icon: <FaCashRegister className="text-emerald-600" />, color: 'from-emerald-500 to-teal-500' },
+    { value: 'errand', label: 'Errand Runner', icon: <FaMotorcycle className="text-yellow-600" />, color: 'from-yellow-500 to-amber-500' },
     { value: 'customer', label: 'Customer', icon: <FaUserTie className="text-gray-600" />, color: 'from-gray-600 to-gray-800' }
   ];
 

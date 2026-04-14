@@ -86,10 +86,24 @@ const Sidebar = () => {
           roles: ['errand']
         },
         { 
+          id: 'create-errand',
+          label: 'Create Errand', 
+          icon: <FaPlusCircle />, 
+          path: '/errands/create-runner',
+          roles: ['errand']
+        },
+        { 
           id: 'my-errands',
           label: 'My Errands', 
           icon: <FaListAlt />, 
           path: '/errands/my',
+          roles: ['errand']
+        },
+        { 
+          id: 'draft-errands',
+          label: 'Draft Errands', 
+          icon: <FaClock />, 
+          path: '/errands/drafts',
           roles: ['errand']
         },
         { 

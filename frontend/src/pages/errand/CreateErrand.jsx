@@ -309,9 +309,6 @@ const CreateErrand = () => {
         errandData.agent_branch = formData.agent_branch || undefined;
         errandData.tracking_number = formData.tracking_number || undefined;
       }
-
-      console.log('Submitting errand data:', errandData);
-
       // FIXED: Changed to relative URL
       const response = await fetch('/api/errands', {
         method: 'POST',

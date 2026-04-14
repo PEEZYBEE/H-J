@@ -129,7 +129,6 @@ const ProductDetailPage = () => {
       // Small delay to ensure video is ready
       setTimeout(() => {
         videoRef.current.play().catch(e => {
-          console.log('Autoplay prevented:', e);
           // User will need to click play - that's fine
         });
       }, 100);
@@ -141,7 +140,6 @@ const ProductDetailPage = () => {
       // FIXED: Using relative URL (already correct)
       const response = await fetch(`/api/products/products/${id}`);
       const data = await response.json();
-      console.log('Product data:', data.product || data);
       setProduct(data.product || data);
     } catch (error) {
       console.error('Error fetching product:', error);

@@ -4,6 +4,9 @@ load_dotenv()
 import os
 from datetime import timedelta
 from flask import Flask, send_from_directory, jsonify
+from werkzeug.middleware.proxy_fix import ProxyFix
+import logging
+from logging.handlers import RotatingFileHandler
 from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager
 from flask_cors import CORS
@@ -21,6 +24,8 @@ jwt = JWTManager()
 
 def create_app():
     app = Flask(__name__)
+    # Honor reverse proxy headers (X-Forwarded-*) when behind a load balancer / proxy
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
     flask_env = os.getenv('FLASK_ENV', 'development').lower()
     is_production = flask_env == 'production'
     app.config['IS_PRODUCTION'] = is_production
@@ -31,7 +36,12 @@ def create_app():
         raise RuntimeError('SECRET_KEY must be set in production')
     app.config['SECRET_KEY'] = secret_key or 'dev-session-secret-key'
     app.config['SESSION_TYPE'] = 'filesystem'
-    app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
+    # Sessions should be short lived; carts may persist, but auth sessions rotate via JWTs
+    app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=1)
+    # Secure cookie settings
+    app.config['SESSION_COOKIE_SECURE'] = is_production
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
     
     # Database configuration
     database_url = os.getenv('DATABASE_URL')
@@ -45,10 +55,14 @@ def create_app():
     if is_production and not jwt_secret_key:
         raise RuntimeError('JWT_SECRET_KEY must be set in production')
     app.config['JWT_SECRET_KEY'] = jwt_secret_key or 'dev-jwt-secret-key'
-    app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
+    # Short-lived access tokens and longer refresh tokens
+    app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=1)
+    app.config['JWT_REFRESH_TOKEN_EXPIRES'] = timedelta(days=7)
     app.config['JWT_TOKEN_LOCATION'] = ['headers']
     app.config['JWT_HEADER_NAME'] = 'Authorization'
     app.config['JWT_HEADER_TYPE'] = 'Bearer'
+    # Accept legacy tokens that store numeric user IDs in the `sub` claim.
+    app.config['JWT_VERIFY_SUB'] = False
     
     # Bcrypt configuration
     app.config['BCRYPT_LOG_ROUNDS'] = int(os.getenv('BCRYPT_LOG_ROUNDS', 12))
@@ -84,6 +98,27 @@ def create_app():
     migrate = Migrate(app, db)
     jwt.init_app(app)
     bcrypt.init_app(app)
+    # ============ LOGGING =============
+    logs_dir = os.path.join(os.getcwd(), 'logs')
+    try:
+        os.makedirs(logs_dir, exist_ok=True)
+    except Exception:
+        pass
+    log_file = os.path.join(logs_dir, 'app.log')
+    handler = RotatingFileHandler(log_file, maxBytes=10 * 1024 * 1024, backupCount=10)
+    formatter = logging.Formatter('%(asctime)s %(levelname)s [%(name)s] %(message)s')
+    handler.setFormatter(formatter)
+    handler.setLevel(logging.WARNING if is_production else logging.INFO)
+    app.logger.addHandler(handler)
+    app.logger.setLevel(logging.WARNING if is_production else logging.DEBUG)
+
+    # Enforce HTTPS and security headers in production (recommended at load balancer)
+    if is_production:
+        try:
+            from flask_talisman import Talisman
+            Talisman(app, force_https=True, strict_transport_security=True)
+        except Exception:
+            app.logger.warning('Flask-Talisman not available; ensure HTTPS/HSTS at proxy')
     # ============ RATE LIMITING: Flask-Limiter integration =============
     try:
         from flask_limiter import Limiter
@@ -138,6 +173,14 @@ def create_app():
     app.register_blueprint(errand_bp, url_prefix='/api')
     app.register_blueprint(notification_bp, url_prefix='/api')
     
+    # Apply a stricter rate limit for login-specific endpoint if limiter available
+    try:
+        if limiter is not None:
+            # The blueprint endpoints are registered as 'auth.login'
+            if 'auth.login' in app.view_functions:
+                limiter.limit("5 per minute")(app.view_functions['auth.login'])
+    except Exception:
+        pass
     # Health check endpoint
     @app.route("/api/health")
     def health_check():
@@ -224,6 +267,31 @@ def create_app():
         g.sanitized_json = sanitized.get('json')
         g.sanitized_args = sanitized.get('args')
         g.sanitized_form = sanitized.get('form')
+
+
+    # Basic request logging for traffic monitoring (do not log request bodies)
+    @app.before_request
+    def _log_request():
+        try:
+            # Default: on in development, off in production (can override via LOG_REQUESTS=true/false)
+            log_requests = os.getenv('LOG_REQUESTS', 'false' if is_production else 'true').lower() == 'true'
+            if not log_requests:
+                return
+            remote = _flask_request.headers.get('X-Forwarded-For', _flask_request.remote_addr)
+            app.logger.info(f"REQ {remote} {_flask_request.method} {_flask_request.path} UA={_flask_request.user_agent.string}")
+        except Exception:
+            pass
+
+
+    # Global error handler to capture exceptions and avoid leaking stack traces in production
+    @app.errorhandler(Exception)
+    def handle_exception(e):
+        app.logger.exception('Unhandled exception: %s', str(e))
+        if is_production:
+            return jsonify({'success': False, 'error': 'Internal server error'}), 500
+        else:
+            # In development re-raise to see tracebacks
+            raise
 
     
     

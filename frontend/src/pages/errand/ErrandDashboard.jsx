@@ -15,8 +15,10 @@ import {
   FaTruck,
   FaBoxOpen,
   FaPlus,
-  FaListAlt  // <-- ADD THIS IMPORT for the new icon
+  FaListAlt,
+  FaSave
 } from 'react-icons/fa';
+import { getOfflineErrandQueue } from '../../services/offlineErrandQueue';
 
 const ErrandDashboard = () => {
   const [user, setUser] = useState(null);
@@ -24,6 +26,7 @@ const ErrandDashboard = () => {
   const [availableErrands, setAvailableErrands] = useState([]);
   const [allErrands, setAllErrands] = useState([]);
   const [pendingErrands, setPendingErrands] = useState([]);
+  const [draftErrands, setDraftErrands] = useState([]);
   const [activeTab, setActiveTab] = useState('available');
   const [loading, setLoading] = useState(true);
   const [acceptingId, setAcceptingId] = useState(null);
@@ -50,6 +53,12 @@ const ErrandDashboard = () => {
   useEffect(() => {
     const userData = JSON.parse(localStorage.getItem('user') || '{}');
     setUser(userData);
+    
+    // Load draft errands from offline queue (for errand runners)
+    if (userData.role === 'errand') {
+      setDraftErrands(getOfflineErrandQueue());
+    }
+    
     fetchAllErrands();
   }, []);
 
@@ -66,10 +75,6 @@ const ErrandDashboard = () => {
           fetchWithAuth('/api/errands'),
           fetchWithAuth('/api/errands/pending')
         ]);
-        
-        console.log('All errands:', allRes);
-        console.log('Pending errands:', pendingRes);
-        
         const allList = allRes.errands || allRes.data?.errands || [];
         const pendingList = pendingRes.errands || pendingRes.data?.errands || [];
         
@@ -98,10 +103,6 @@ const ErrandDashboard = () => {
           fetchWithAuth('/api/errands/my'),
           fetchWithAuth('/api/errands/available')
         ]);
-        
-        console.log('My errands:', myRes);
-        console.log('Available errands:', availableRes);
-        
         const myList = myRes.errands || myRes.data?.errands || [];
         const availableList = availableRes.errands || availableRes.data?.errands || [];
         
@@ -219,7 +220,8 @@ const ErrandDashboard = () => {
       orange: 'bg-orange-100 text-orange-800',
       purple: 'bg-purple-100 text-purple-800',
       red: 'bg-red-100 text-red-800',
-      green: 'bg-green-100 text-green-800'
+      green: 'bg-green-100 text-green-800',
+      yellow: 'bg-yellow-100 text-yellow-800'
     };
 
     return (
@@ -260,7 +262,7 @@ const ErrandDashboard = () => {
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2">
                 <FaMotorcycle className="text-blue-600" />
-                {isAdmin ? 'Errand Management' : 'Errand Runner Dashboard'}
+                {isAdmin ? 'Errand Management' : 'Errand Dashboard'}
               </h1>
               <p className="text-gray-600">
                 Welcome back, {user?.full_name || user?.username}! 
@@ -331,6 +333,15 @@ const ErrandDashboard = () => {
             color="green"
             onClick={() => setActiveTab('history')}
           />
+          {!isAdmin && user?.role === 'errand' && (
+            <StatsCard
+              title="Drafts"
+              value={draftErrands.length}
+              icon={<FaSave className="text-xl" />}
+              color="yellow"
+              onClick={() => navigate('/errands/drafts')}
+            />
+          )}
           {!isAdmin && (
             <StatsCard
               title="Earnings"

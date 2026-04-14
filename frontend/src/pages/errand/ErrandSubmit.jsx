@@ -91,7 +91,6 @@ const ErrandSubmit = () => {
     try {
       // FIXED: Changed to relative URL
       const response = await fetchWithAuth(`/api/errands/${errandId}`);
-      console.log('Errand details:', response);
       setErrand(response.errand || response.data || response);
       setImageErrors({ product: false, receipt: false });
       

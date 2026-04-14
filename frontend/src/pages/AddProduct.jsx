@@ -59,13 +59,10 @@ const AddProduct = () => {
   const fetchCategories = async () => {
     try {
       const response = await categoriesAPI.getAllCategories();
-      console.log('Categories API response:', response);
-      
       const categoriesList = response.categories || response || [];
       setCategories(categoriesList);
       
       if (categoriesList.length === 0) {
-        console.warn('No categories found in response');
       }
     } catch (error) {
       console.error('Error fetching categories:', error);
