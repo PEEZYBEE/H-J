@@ -210,7 +210,7 @@ const Footer = () => {
 
               <div className="pt-2">
                 <p className="text-sm font-medium mb-2">Pickup Point</p>
-                <p className="text-sm text-white/90">Dynamic Mall 3rd floor ML 151, Tom Mboya Street, Nairobi, Kenya</p>
+                <p className="text-sm text-white/90">Dynamic Mall 3rd floor ML141A, Tom Mboya Street, Nairobi, Kenya</p>
               </div>
             </div>
           </div>
