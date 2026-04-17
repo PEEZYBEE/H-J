@@ -434,11 +434,14 @@ class User(db.Model):
     inventory_transactions = db.relationship('InventoryTransaction', back_populates='creator', lazy=True)
     
     def set_password(self, password):
-        # Use Werkzeug's PBKDF2 with SHA256 for deterministic, secure hashing
-        self.password_hash = generate_password_hash(password, method='pbkdf2:sha256', salt_length=16)
-    
+        from flask_bcrypt import Bcrypt
+        bcrypt = Bcrypt()
+        self.password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
+
     def check_password(self, password):
-        return check_password_hash(self.password_hash, password)
+        from flask_bcrypt import Bcrypt
+        bcrypt = Bcrypt()
+        return bcrypt.check_password_hash(self.password_hash, password)
     
     def to_dict(self):
         return {
