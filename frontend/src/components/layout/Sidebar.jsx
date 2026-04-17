@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, NavLink } from 'react-router-dom';
 import { 
   FaHome, 
@@ -43,6 +43,14 @@ const Sidebar = () => {
   const open = isPinned || isHovered || mobileOpen;
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Auto-close sidebar on mobile after navigation
+  useEffect(() => {
+    if (mobileOpen && window.innerWidth < 768) {
+      setMobileOpen(false);
+    }
+    // eslint-disable-next-line
+  }, [location.pathname]);
   
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const userRole = user.role || 'customer';
