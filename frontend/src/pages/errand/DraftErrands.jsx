@@ -95,7 +95,36 @@ const DraftErrands = () => {
 
   const fileToDataUrl = (file) => new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        let width = img.width;
+        let height = img.height;
+        // More aggressive compression: max 600px width
+        const maxWidth = 600;
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width;
+          width = maxWidth;
+        }
+        canvas.width = width;
+        canvas.height = height;
+        ctx.drawImage(img, 0, 0, width, height);
+        // Lower quality: 0.5 (50%)
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            reject(new Error('Image compression failed'));
+            return;
+          }
+          const compressedReader = new FileReader();
+          compressedReader.onloadend = () => resolve(compressedReader.result);
+          compressedReader.readAsDataURL(blob);
+        }, 'image/jpeg', 0.5);
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
@@ -315,6 +344,13 @@ const DraftErrands = () => {
         formData: { ...formData },
         photoURLs: draft.photoURLs || []
       };
+
+      // Check estimated size before saving (use actual File sizes if provided)
+      const estimatedSize = ((productPhoto?.size || 0) + (receiptPhoto?.size || 0)) / 1024 / 1024;
+      if (estimatedSize > 4) {
+        alert(`Photos are too large (${estimatedSize.toFixed(1)}MB). Please use smaller images.`);
+        return;
+      }
 
       // Add any new photos to the photoURLs
       if (productPhoto) {

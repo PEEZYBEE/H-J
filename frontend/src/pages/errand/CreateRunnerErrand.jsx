@@ -90,34 +90,29 @@ const CreateRunnerErrand = () => {
     reader.onload = (e) => {
       const img = new Image();
       img.onload = () => {
-        // Calculate new dimensions (max 800px width)
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         let width = img.width;
         let height = img.height;
-        const maxWidth = 800;
-
+        // More aggressive compression: max 600px width
+        const maxWidth = 600;
         if (width > maxWidth) {
           height = (height * maxWidth) / width;
           width = maxWidth;
         }
-
         canvas.width = width;
         canvas.height = height;
         ctx.drawImage(img, 0, 0, width, height);
-
-        // Compress to JPEG at 70% quality
+        // Lower quality: 0.5 (50%)
         canvas.toBlob((blob) => {
           if (!blob) {
             reject(new Error('Image compression failed'));
             return;
           }
           const compressedReader = new FileReader();
-          compressedReader.onloadend = () => {
-            resolve(compressedReader.result);
-          };
+          compressedReader.onloadend = () => resolve(compressedReader.result);
           compressedReader.readAsDataURL(blob);
-        }, 'image/jpeg', 0.7);
+        }, 'image/jpeg', 0.5);
       };
       img.onerror = reject;
       img.src = e.target.result;
@@ -295,6 +290,13 @@ const CreateRunnerErrand = () => {
 
     if (!productPhoto || !receiptPhoto) {
       alert('Please attach both photos before saving draft.');
+      return;
+    }
+
+    // Check estimated size before saving
+    const estimatedSize = (productPhoto.size + receiptPhoto.size) / 1024 / 1024;
+    if (estimatedSize > 4) {
+      alert(`Photos are too large (${estimatedSize.toFixed(1)}MB). Please use smaller images.`);
       return;
     }
 
