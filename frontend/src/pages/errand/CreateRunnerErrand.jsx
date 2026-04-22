@@ -87,7 +87,41 @@ const CreateRunnerErrand = () => {
 
   const fileToDataUrl = (file) => new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        // Calculate new dimensions (max 800px width)
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        let width = img.width;
+        let height = img.height;
+        const maxWidth = 800;
+
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width;
+          width = maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Compress to JPEG at 70% quality
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            reject(new Error('Image compression failed'));
+            return;
+          }
+          const compressedReader = new FileReader();
+          compressedReader.onloadend = () => {
+            resolve(compressedReader.result);
+          };
+          compressedReader.readAsDataURL(blob);
+        }, 'image/jpeg', 0.7);
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
@@ -271,9 +305,8 @@ const CreateRunnerErrand = () => {
       const draft = {
         id: `draft_${Date.now()}`,
         createdAt: new Date().toISOString(),
-        formData,
-        productPhotoDataUrl,
-        receiptPhotoDataUrl
+        formData: { ...formData },
+        photoURLs: [productPhotoDataUrl, receiptPhotoDataUrl]
       };
 
       const updatedQueue = addOfflineErrandDraft(draft);
@@ -281,7 +314,12 @@ const CreateRunnerErrand = () => {
       resetForm();
       alert('Draft saved locally. You can upload it when network is available.');
     } catch (error) {
-      alert('Failed to save draft locally.');
+      console.error('Save draft error:', error);
+      if (error && (error.name === 'QuotaExceededError' || error.code === 22)) {
+        alert('Storage quota exceeded. Please try with smaller images or clear some drafts.');
+      } else {
+        alert('Failed to save draft locally. ' + (error && error.message ? error.message : ''));
+      }
     }
   };
 
@@ -310,8 +348,11 @@ const CreateRunnerErrand = () => {
 
     for (const draft of offlineDrafts) {
       try {
-        const productFile = await dataUrlToFile(draft.productPhotoDataUrl, `${draft.id}_product.jpg`);
-        const receiptFile = await dataUrlToFile(draft.receiptPhotoDataUrl, `${draft.id}_receipt.jpg`);
+        const productDataUrl = draft.photoURLs?.[0] || draft.productPhotoDataUrl;
+        const receiptDataUrl = draft.photoURLs?.[1] || draft.receiptPhotoDataUrl;
+
+        const productFile = productDataUrl ? await dataUrlToFile(productDataUrl, `${draft.id}_product.jpg`) : null;
+        const receiptFile = receiptDataUrl ? await dataUrlToFile(receiptDataUrl, `${draft.id}_receipt.jpg`) : null;
 
         await submitPayload({
           token,
@@ -329,7 +370,8 @@ const CreateRunnerErrand = () => {
 
         removeOfflineErrandDraft(draft.id);
         successCount += 1;
-      } catch {
+      } catch (e) {
+        console.error('Failed uploading draft:', e);
         failedCount += 1;
       }
     }
